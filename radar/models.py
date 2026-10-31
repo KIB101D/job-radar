@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class Source(models.Model):
@@ -41,7 +42,7 @@ class Vacancy(models.Model):
     is_remote = models.BooleanField(default=False, db_index=True)
     salary_text = models.CharField(max_length=100, blank=True)
     published_at = models.DateTimeField(db_index=True)
-    first_seen_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    first_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
     last_seen_at = models.DateTimeField()
     is_active = models.BooleanField(default=True, db_index=True)
 

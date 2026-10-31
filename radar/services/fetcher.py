@@ -162,6 +162,13 @@ def ingest(source: Source, items: Iterable[ParsedVacancy]) -> IngestResult:
 
     Vacancy.objects.bulk_create(to_create)
     Vacancy.objects.bulk_update(to_update, [*UPDATABLE_FIELDS, "last_seen_at", "is_active"])
+
+    # Remember that this feed lists these vacancies (idempotent).
+    Through = Vacancy.sources.through
+    Through.objects.bulk_create(
+        [Through(vacancy_id=v.pk, source_id=source.pk) for v in [*to_create, *to_update]],
+        ignore_conflicts=True,
+    )
     return IngestResult(created=len(to_create), updated=len(to_update))
 
 

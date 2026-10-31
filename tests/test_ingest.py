@@ -74,3 +74,26 @@ def test_vacancy_keeps_its_first_source(python_source, items):
 
 def test_empty_feed_is_noop(python_source):
     assert ingest(python_source, []).created == 0
+
+
+def test_vacancy_listed_in_several_feeds_keeps_all_categories(python_source, items):
+    """Real DOU behaviour: one vacancy can appear in Front End and JavaScript feeds."""
+    from radar.models import Source
+
+    javascript = Source.objects.get(category="JavaScript")
+    ingest(python_source, items[:3])
+    result = ingest(javascript, items[:1])
+
+    assert (result.created, result.updated) == (0, 1)
+    both = Vacancy.objects.prefetch_related("sources").get(guid=items[0].guid)
+    assert both.source == python_source  # first seen in
+    assert both.categories == ["JavaScript", "Python"]
+    assert Vacancy.objects.in_categories(["JavaScript"]).count() == 1
+    assert Vacancy.objects.in_categories(["Python", "JavaScript"]).count() == 3
+
+
+def test_repeated_ingest_does_not_duplicate_feed_links(python_source, items):
+    ingest(python_source, items)
+    ingest(python_source, items)
+
+    assert Vacancy.sources.through.objects.count() == 25

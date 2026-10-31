@@ -28,11 +28,12 @@ class VacancyAdmin(admin.ModelAdmin):
         "first_seen_at",
         "is_active",
     )
-    list_filter = ("is_active", "is_remote", "source")
+    list_filter = ("is_active", "is_remote", "sources")
     search_fields = ("title", "company", "description_text", "guid")
     date_hierarchy = "published_at"
     list_select_related = ("source",)
     readonly_fields = ("guid", "first_seen_at", "last_seen_at")
+    filter_horizontal = ("sources",)
     list_per_page = 50
 
 

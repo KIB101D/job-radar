@@ -1,0 +1,16 @@
+{% load radar_ui %}
+<article class="vac{% if vacancy.pk in seen_ids %} is-seen{% elif vacancy.first_seen_at|is_fresh %} is-fresh{% endif %}">
+  <h3 class="vac-title"><a href="{{ vacancy.url }}" target="_blank" rel="noopener">{{ vacancy.title }}</a></h3>
+  <p class="vac-where">
+    {% if vacancy.company %}<span class="vac-company">{{ vacancy.company }}</span>{% endif %}
+    {% with where=vacancy.location|places %}{% if where %}<span class="vac-place">{{ where }}</span>{% endif %}{% endwith %}
+  </p>
+  <p class="vac-tags">
+    {% if vacancy.is_remote %}<span class="tag tag-remote">віддалено</span>{% endif %}
+    {% if vacancy.salary_text %}<span class="tag tag-salary">{{ vacancy.salary_text }}</span>{% endif %}
+    {% if show_categories %}{% for category in vacancy.categories %}<span class="tag tag-cat">{{ category }}</span>{% endfor %}{% endif %}
+  </p>
+  <p class="vac-time">
+    {% if vacancy.pk in seen_ids %}Надіслано в Telegram{% else %}<time datetime="{{ vacancy.first_seen_at|date:'c' }}">{{ vacancy.first_seen_at|ago }}</time>{% endif %}
+  </p>
+</article>

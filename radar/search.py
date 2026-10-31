@@ -22,6 +22,7 @@ class Page:
     vacancies: list[Vacancy] = field(default_factory=list)
     has_more: bool = False
     next_offset: int = 0
+    total: int = 0
 
 
 def base_queryset(filters: Filters):
@@ -36,15 +37,14 @@ def base_queryset(filters: Filters):
 def search(filters: Filters, *, offset: int = 0, limit: int = 20) -> Page:
     """Newest matching vacancies, paginated by offset over the matched list."""
     qs = base_queryset(filters).newest_first()
-    matched: list[Vacancy] = []
-    for vacancy in qs.iterator(chunk_size=CHUNK_SIZE):
-        if vacancy_matches(filters, vacancy):
-            matched.append(vacancy)
-            if len(matched) > offset + limit:  # one extra tells us there's more
-                break
+    matched = [v for v in qs.iterator(chunk_size=CHUNK_SIZE) if vacancy_matches(filters, v)]
     page = matched[offset : offset + limit]
-    has_more = len(matched) > offset + limit
-    return Page(vacancies=page, has_more=has_more, next_offset=offset + len(page))
+    return Page(
+        vacancies=page,
+        has_more=len(matched) > offset + limit,
+        next_offset=offset + len(page),
+        total=len(matched),
+    )
 
 
 def newer_than(filters: Filters, since_id: int) -> list[Vacancy]:

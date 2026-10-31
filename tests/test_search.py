@@ -39,6 +39,7 @@ def test_search_pagination(make_vacancy):
     third = search(Filters(), offset=second.next_offset, limit=2)
 
     assert first.has_more and second.has_more and not third.has_more
+    assert first.total == third.total == 5
     ids = [v.pk for page in (first, second, third) for v in page.vacancies]
     assert len(ids) == len(set(ids)) == 5
 

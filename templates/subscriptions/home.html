@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block topbar_extra %}
+  {% if existing %}
+    <a class="topbar-link" href="{% url 'subscriptions:detail' existing.token %}">Мій радар</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="home">
+  <section class="intro">
+    {% include "subscriptions/_scope.html" with label="Радар з найсвіжішими вакансіями" %}
+    <h1 class="display">Нові вакансії з DOU знайдуть тебе самі.</h1>
+    <p class="lede">Вкажи слова, які тобі важливі. Сайт показуватиме збіги щойно вони з'являться, а Telegram-бот надішле їх тоді, коли тобі зручно.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="form-title">
+    <h2 id="form-title" class="section-title">Налаштуй фільтри</h2>
+    {% include "subscriptions/_form.html" with submit_label="Створити радар" %}
+  </section>
+
+  {% include "subscriptions/_feed.html" %}
+</div>
+{% endblock %}

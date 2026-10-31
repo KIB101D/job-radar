@@ -22,3 +22,6 @@ TELEGRAM_WEBHOOK_SECRET = "test-webhook-secret"
 
 # Never sleep between sources or retries in tests.
 FETCH_DELAY_BETWEEN_SOURCES_SECONDS = 0
+
+# WhiteNoise only matters for collected static files in production.
+MIDDLEWARE = [m for m in MIDDLEWARE if m != "whitenoise.middleware.WhiteNoiseMiddleware"]  # noqa: F405

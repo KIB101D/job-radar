@@ -1,0 +1,32 @@
+<form method="post" class="filters" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+  {% for field in form %}
+    {% if field.name == "categories" %}
+      <fieldset class="field">
+        <legend class="field-label">{{ field.label }}</legend>
+        <div class="chips">
+          {% for choice in field %}
+            <label class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+          {% endfor %}
+        </div>
+        <p class="field-help">{{ field.help_text }}</p>
+        {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </fieldset>
+    {% elif field.name == "remote_only" %}
+      <div class="field">
+        <label class="switch">{{ field }}<span>{{ field.label }}</span></label>
+      </div>
+    {% else %}
+      <div class="field{% if field.errors %} has-error{% endif %}">
+        <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        <p class="field-help">{{ field.help_text }}</p>
+        {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+</form>

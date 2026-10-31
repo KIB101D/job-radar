@@ -1,0 +1,21 @@
+{% load radar_ui %}{% if not append %}<section id="results" class="results" aria-live="polite">
+{% endif %}
+  {% for vacancy in page.vacancies %}
+    {% include "subscriptions/_vacancy.html" %}
+  {% empty %}
+    {% if not append %}
+      <div class="empty">
+        <p class="empty-title">Поки нічого не знайдено.</p>
+        <p>Спробуй прибрати частину слів, зняти «Тільки віддалено» або додати категорію. Нові вакансії перевіряємо кожні 30 хвилин, тож цей список ще поповниться.</p>
+      </div>
+    {% endif %}
+  {% endfor %}
+  {% if page.has_more %}
+    <button class="btn btn-quiet more"
+            hx-get="{% url 'subscriptions:results' subscription.token %}?offset={{ page.next_offset }}"
+            hx-target="this" hx-swap="outerHTML">Показати ще</button>
+  {% endif %}
+{% if not append %}</section>{% endif %}
+{% if since_id is not None %}
+  {% include "subscriptions/_banner.html" with count=0 oob=True %}
+{% endif %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load radar_ui %}
+
+{% block title %}Мій радар | Job Radar{% endblock %}
+
+{% block content %}
+<div class="radar">
+  <h1 class="display display-sm radar-title">Мій радар</h1>
+  <aside class="side">
+    <div class="side-scope">
+      {% include "subscriptions/_scope.html" with label="Радар з твоїми останніми збігами" %}
+      <p class="side-readout">На радарі {{ page.total }} {{ page.total|uk_plural:"вакансія,вакансії,вакансій" }} за твоїми фільтрами.</p>
+    </div>
+
+    <div class="telegram">
+      {% if subscription.is_linked %}
+        <p class="telegram-state">Telegram підключено. Частоту сповіщень змінюй у боті.</p>
+        {% if bot_link %}<a class="btn btn-quiet" href="{{ bot_link }}" target="_blank" rel="noopener">Відкрити бота</a>{% endif %}
+      {% elif telegram_link %}
+        <a class="btn btn-primary" href="{{ telegram_link }}" target="_blank" rel="noopener">Отримувати в Telegram</a>
+        <p class="field-help">Бот надішле 5 найсвіжіших збігів і запитає, як часто писати далі.</p>
+      {% else %}
+        <button class="btn btn-primary" type="button" disabled>Отримувати в Telegram</button>
+        <p class="field-help">Бот ще не налаштований на цьому сервері.</p>
+      {% endif %}
+    </div>
+
+    <details class="side-filters" {% if form.errors %}open{% endif %}>
+      <summary>Змінити фільтри</summary>
+      {% include "subscriptions/_form.html" with submit_label="Зберегти фільтри" %}
+    </details>
+
+    <p class="bookmark">Збережи адресу цієї сторінки. За нею ти повернешся до своїх фільтрів з будь-якого пристрою, тому не ділися нею з іншими.</p>
+  </aside>
+
+  <div class="main">
+    {% include "subscriptions/_banner.html" with count=0 %}
+    {% include "subscriptions/_results.html" with append=False since_id=None %}
+    {% include "subscriptions/_feed.html" %}
+  </div>
+</div>
+{% endblock %}

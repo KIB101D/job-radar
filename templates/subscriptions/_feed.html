@@ -1,0 +1,13 @@
+{% load radar_ui %}<section id="feed" class="feed" aria-labelledby="feed-title"
+         hx-get="{% url 'subscriptions:feed' %}" hx-trigger="every 180s[document.visibilityState === 'visible']" hx-swap="outerHTML">
+  <h2 id="feed-title" class="section-title">Свіжі вакансії</h2>
+  <p class="section-note">Найновіші з усіх категорій, без твоїх фільтрів.</p>
+  {% for vacancy in feed %}
+    <a class="feed-item" href="{{ vacancy.url }}" target="_blank" rel="noopener">
+      <span class="feed-title">{{ vacancy.title }}</span>
+      <span class="feed-meta">{% if vacancy.company %}{{ vacancy.company }}, {% endif %}{{ vacancy.first_seen_at|ago }}</span>
+    </a>
+  {% empty %}
+    <p class="empty">База ще порожня. Вакансії з'являться після першого оновлення.</p>
+  {% endfor %}
+</section>

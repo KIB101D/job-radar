@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hand-written fixture for edge cases not present in the real dou_python.xml.
+  Same structure as a real DOU feed.
+-->
+<rss version="2.0"><channel><title>Edge cases</title><link>https://jobs.dou.ua/vacancies/</link><description/>
+<item>
+  <title>Розробник в команду платформи в Acme, до $5000, Вроцлав (Польща), Львів</title>
+  <link>https://jobs.dou.ua/companies/acme/vacancies/100001/?utm_source=jobsrss</link>
+  <description>&lt;p&gt;Шукаємо розробника.&lt;/p&gt;</description>
+  <pubDate>Fri, 30 Oct 2026 10:00:00 +0200</pubDate>
+  <guid>https://jobs.dou.ua/companies/acme/vacancies/100001/?1793000000</guid>
+</item>
+<item>
+  <title>Python Engineer (Remote) в Beta &amp;amp; Sons, від $2000, за кордоном</title>
+  <link>https://jobs.dou.ua/companies/beta/vacancies/100002/?utm_source=jobsrss</link>
+  <description>&lt;h3&gt;Requirements&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Python&lt;/li&gt;&lt;li&gt;Django&lt;/li&gt;&lt;/ul&gt;&lt;script&gt;alert(1)&lt;/script&gt;</description>
+  <pubDate>Fri, 30 Oct 2026 09:00:00 +0200</pubDate>
+  <guid>https://jobs.dou.ua/companies/beta/vacancies/100002/?1792990000</guid>
+</item>
+<item>
+  <title>Python Engineer (Remote) в Beta &amp;amp; Sons, від $2000, за кордоном</title>
+  <link>https://jobs.dou.ua/companies/beta/vacancies/100002/?utm_source=jobsrss</link>
+  <description>&lt;p&gt;Duplicate of the item above with a bumped guid timestamp.&lt;/p&gt;</description>
+  <pubDate>Fri, 30 Oct 2026 11:00:00 +0200</pubDate>
+  <guid>https://jobs.dou.ua/companies/beta/vacancies/100002/?1793010000</guid>
+</item>
+<item>
+  <title>QA Engineer в Gamma</title>
+  <link>https://jobs.dou.ua/companies/gamma/vacancies/100003/?utm_source=jobsrss</link>
+  <description></description>
+  <guid>https://jobs.dou.ua/companies/gamma/vacancies/100003/?1793020000</guid>
+</item>
+</channel></rss>

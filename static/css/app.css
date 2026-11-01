@@ -113,7 +113,6 @@ a:hover { color: var(--lime-hover); }
 .h3 { margin: 0; font: 600 22px/1.25 var(--font-display); }
 .lead { margin: 0; color: var(--muted); font-size: 16px; max-width: 620px; }
 .lead-lg { font-size: 19px; line-height: 1.55; max-width: 560px; }
-.lead-note { font-size: 14px; }
 
 /* ---- Header & footer --------------------------------------------------------- */
 

@@ -130,3 +130,13 @@ def test_filters_from_subscription():
     assert Filters.from_subscription(sub) == Filters(
         include=("python",), categories=frozenset({"Python"}), remote_only=True
     )
+
+
+def test_matched_keywords_keeps_user_order():
+    from radar.matching import matched_keywords
+
+    f = Filters(include=("django", "python", "rust"))
+    assert matched_keywords(f, title="Python dev", description="Django, DRF") == [
+        "django",
+        "python",
+    ]

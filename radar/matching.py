@@ -105,3 +105,9 @@ def vacancy_matches(filters: Filters, vacancy) -> bool:
         is_remote=vacancy.is_remote,
         categories=vacancy.categories,
     )
+
+
+def matched_keywords(filters: Filters, *, title: str, description: str) -> list[str]:
+    """Which include keywords a vacancy matched, in the user's order (for card tags)."""
+    text = f"{title}\n{description}"
+    return [kw for kw in filters.include if compile_keywords((kw,)).search(text)]

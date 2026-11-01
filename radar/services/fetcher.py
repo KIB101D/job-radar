@@ -48,7 +48,9 @@ Sleep = Callable[[float], None]
 
 
 class FetchError(Exception):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code  # set for HTTP errors (404, 403, final 5xx...)
 
 
 @dataclass
@@ -105,14 +107,17 @@ def fetch_url(
 
         if response.status_code in RETRYABLE_STATUS:
             if is_last:
-                raise FetchError(f"HTTP {response.status_code} after {attempt + 1} attempts: {url}")
+                raise FetchError(
+                    f"HTTP {response.status_code} after {attempt + 1} attempts: {url}",
+                    response.status_code,
+                )
             delay = _retry_after(response) or _backoff(attempt)
             logger.warning("HTTP %s from %s, retry in %.1fs", response.status_code, url, delay)
             sleep(delay)
             continue
 
         if response.is_error:
-            raise FetchError(f"HTTP {response.status_code}: {url}")
+            raise FetchError(f"HTTP {response.status_code}: {url}", response.status_code)
         return response
 
     raise AssertionError("unreachable")  # pragma: no cover

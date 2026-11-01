@@ -32,7 +32,7 @@ class VacancyAdmin(admin.ModelAdmin):
     search_fields = ("title", "company", "description_text", "guid")
     date_hierarchy = "published_at"
     list_select_related = ("source",)
-    readonly_fields = ("guid", "first_seen_at", "last_seen_at")
+    readonly_fields = ("guid", "first_seen_at", "last_seen_at", "last_checked_at")
     filter_horizontal = ("sources",)
     list_per_page = 50
 

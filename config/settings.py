@@ -136,6 +136,9 @@ FETCH_USER_AGENT = env(
 FETCH_TIMEOUT_SECONDS = env.float("FETCH_TIMEOUT_SECONDS", default=15.0)
 FETCH_MAX_RETRIES = env.int("FETCH_MAX_RETRIES", default=3)
 FETCH_DELAY_BETWEEN_SOURCES_SECONDS = env.float("FETCH_DELAY_BETWEEN_SOURCES_SECONDS", default=2.0)
+# check_active opens vacancy pages one by one; pause between them and cap a run.
+CHECK_ACTIVE_DELAY_SECONDS = env.float("CHECK_ACTIVE_DELAY_SECONDS", default=1.5)
+CHECK_ACTIVE_MAX_PER_RUN = env.int("CHECK_ACTIVE_MAX_PER_RUN", default=300)
 
 LOGGING = {
     "version": 1,

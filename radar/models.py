@@ -52,6 +52,8 @@ class Vacancy(models.Model):
     first_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
     last_seen_at = models.DateTimeField()
     is_active = models.BooleanField(default=True, db_index=True)
+    # When check_active last opened the vacancy page (only for those gone from the feed).
+    last_checked_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     objects = VacancyQuerySet.as_manager()
 

@@ -499,6 +499,38 @@ def test_notifications_card_autosaves(client, linked):
     assert "Наступне сповіщення о 16:00" in html and "(Madrid)" in html  # 15:40 in Madrid
 
 
+def test_notifications_card_saves_only_the_changed_field(client, linked):
+    linked.frequency = Frequency.HOURLY  # set elsewhere (the bot) after the page loaded
+    linked.save()
+
+    client.post(
+        url("notifications", linked),
+        {
+            "changed": "quiet_hours_start",
+            "frequency": "daily",  # stale
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "23",
+            "quiet_hours_end": "8",
+        },
+    )
+
+    linked.refresh_from_db()
+    assert (linked.frequency, linked.quiet_hours_start) == (Frequency.HOURLY, 23)
+
+
+def test_notifications_card_get_rereads_database(client, linked):
+    linked.frequency = Frequency.EVERY_6H
+    linked.save()
+    html = html_of(client.get(url("notifications", linked)))
+    assert 'id="bot-card"' in html and 'value="every_6h" checked' in html
+
+
+def test_notifications_card_ignores_unknown_changed_field(client, linked):
+    client.post(url("notifications", linked), {"changed": "chat_id", "chat_id": "1"})
+    linked.refresh_from_db()
+    assert linked.chat_id == 42
+
+
 def test_next_slot_preview_does_not_save(client, linked):
     with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
         html = html_of(

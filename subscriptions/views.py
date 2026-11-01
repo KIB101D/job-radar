@@ -299,15 +299,42 @@ def frequency(request, token: str):
 # --- actions ------------------------------------------------------------------------
 
 
-@require_POST
+# Fields the bot settings card can change, one at a time.
+CARD_FIELDS = ("frequency", "quiet_hours_enabled", "quiet_hours_start", "quiet_hours_end")
+
+
+@require_http_methods(["GET", "POST"])
 def notifications(request, token: str):
-    """Auto-saved bot settings card on the radar's Telegram page (HTMX)."""
+    """
+    Bot settings card on the radar's Telegram page (HTMX).
+
+    GET re-renders it from the database, so a tab you return to (say, after
+    changing the frequency in the bot) shows current values.
+
+    POST auto-saves ONE field: the one the user just changed (`changed`, sent by
+    the page). Every other field is taken from the database, not from the page.
+    Otherwise an old tab would write its stale values back, e.g. switching quiet
+    hours there would also revert a frequency just chosen in the bot.
+    """
     subscription = get_object_or_404(Subscription, token=token)
-    form = NotificationsForm(request.POST, instance=subscription)
-    saved = form.is_valid()
-    if saved:
-        form.save()
-        form = NotificationsForm(instance=subscription)
+    saved = False
+    form = NotificationsForm(instance=subscription)
+    if request.method == "POST":
+        data = _current_card_values(subscription)
+        changed = request.POST.get("changed", "")
+        if changed in CARD_FIELDS:
+            if changed == "quiet_hours_enabled":
+                data.pop(changed, None)  # unchecked boxes aren't sent at all
+            if changed in request.POST:
+                data[changed] = request.POST[changed]
+        else:  # no JS: a normal submit of the whole card
+            data = request.POST.copy()
+        data["timezone"] = request.POST.get("timezone", "")
+        form = NotificationsForm(data, instance=subscription)
+        saved = form.is_valid()
+        if saved:
+            form.save()
+            form = NotificationsForm(instance=subscription)
     context = {
         "subscription": subscription,
         "notifications_form": form,
@@ -315,6 +342,17 @@ def notifications(request, token: str):
         **_bot_context(subscription),
     }
     return render(request, "subscriptions/_bot_settings.html", context)
+
+
+def _current_card_values(subscription: Subscription) -> dict:
+    data = {
+        "frequency": subscription.frequency,
+        "quiet_hours_start": subscription.quiet_hours_start,
+        "quiet_hours_end": subscription.quiet_hours_end,
+    }
+    if subscription.quiet_hours_enabled:
+        data["quiet_hours_enabled"] = "on"
+    return data
 
 
 @require_POST

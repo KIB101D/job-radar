@@ -3,7 +3,13 @@
   - not linked: what happens after Start + a button to the connect step;
   - linked: frequency and quiet hours, auto-saved on change (HTMX), next slot.
   Params: subscription, notifications_form, bot_username, deep_link, next_slot, tz_label, saved.
-{% endcomment %}<div id="bot-card" class="panel bot-card">
+  The card re-reads itself from the database when the tab becomes visible again,
+  and each change saves only the field that changed (see views.notifications),
+  so a tab left open while you used the bot can't overwrite the bot's changes.
+{% endcomment %}<div id="bot-card" class="panel bot-card"
+     hx-get="{% url 'subscriptions:notifications' subscription.token %}"
+     hx-trigger="visibilitychange[document.visibilityState === 'visible'] from:document"
+     hx-swap="outerHTML">
 {% if subscription.is_linked %}
   <div class="bot-card-head">
     <div class="bot-avatar">{% include "components/icons.html" with name="telegram" %}</div>
@@ -20,7 +26,8 @@
   {% with form=notifications_form %}
   <form class="bot-settings" method="post"
         hx-post="{% url 'subscriptions:notifications' subscription.token %}"
-        hx-trigger="change" hx-target="#bot-card" hx-swap="outerHTML">
+        hx-trigger="change" hx-target="#bot-card" hx-swap="outerHTML"
+        hx-vals='js:{changed: event.target.name}'>
     {% csrf_token %}
     {{ form.timezone }}
     <fieldset class="field">

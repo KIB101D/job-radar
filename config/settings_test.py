@@ -4,9 +4,18 @@ import os
 
 os.environ.setdefault("SECRET_KEY", "test-only-secret-key")
 
+import dj_database_url  # noqa: E402
+
 from .settings import *  # noqa: E402,F403
 
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
+# In-memory SQLite by default. CI also runs the suite on Postgres (what Neon runs)
+# by setting TEST_DATABASE_URL; pytest-django creates and drops a test_ database.
+_test_db = os.environ.get("TEST_DATABASE_URL")
+DATABASES = {
+    "default": dj_database_url.parse(_test_db)
+    if _test_db
+    else {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
+}
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},

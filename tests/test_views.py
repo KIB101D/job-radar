@@ -760,3 +760,9 @@ def test_filters_card_rereads_the_database_when_changed_in_the_bot(client, subsc
     html = html_of(client.get(refresh))
     assert 'value="django"' in html
     assert 'id="results" class="results" aria-live="polite" hx-swap-oob="true"' in html
+
+
+def test_health_check_answers_without_touching_the_database(client, django_assert_num_queries):
+    with django_assert_num_queries(0):
+        response = client.get("/healthz/")
+    assert response.status_code == 200 and response.content == b"ok"

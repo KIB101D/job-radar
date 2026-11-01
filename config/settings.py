@@ -28,6 +28,13 @@ else:
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
+# Render sets this to the service's public host (job-radar.onrender.com), so a
+# fresh deploy works without hand-editing the host lists.
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -79,6 +86,10 @@ DATABASES = {
         conn_health_checks=True,
     )
 }
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    # Neon's pooled endpoint is PgBouncer in transaction mode, where server-side
+    # cursors (QuerySet.iterator) break. The tables are small; plain cursors are fine.
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -109,14 +120,28 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 if not DEBUG:
+    # Render terminates HTTPS and redirects http:// to https:// at its edge, so
+    # Django only needs to trust the forwarded scheme (no SECURE_SSL_REDIRECT,
+    # which would also redirect Render's internal health checks).
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=60 * 60 * 24 * 30)
+    SILENCED_SYSTEM_CHECKS = [
+        "security.W008",  # SECURE_SSL_REDIRECT: Render redirects to HTTPS itself (see above)
+        "security.W005",  # HSTS for subdomains / preload: not ours to decide on
+        "security.W021",  # *.onrender.com
+    ]
 
 # --- Job Radar ---------------------------------------------------------------
 
-# Public base URL of the site, used in bot messages ("Змінити фільтри" link).
-SITE_URL = env("SITE_URL", default="http://localhost:8000").rstrip("/")
+# Public base URL of the site, used in bot messages and for the Telegram webhook.
+SITE_URL = env(
+    "SITE_URL",
+    default=f"https://{RENDER_EXTERNAL_HOSTNAME}"
+    if RENDER_EXTERNAL_HOSTNAME
+    else "http://localhost:8000",
+).rstrip("/")
 
 # Telegram bot. The webhook is SITE_URL + /telegram/webhook/; Telegram sends
 # TELEGRAM_WEBHOOK_SECRET in a header so we know the request is really from it.
@@ -149,7 +174,7 @@ LOGGING = {
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "simple"},
     },
-    "root": {"handlers": ["console"], "level": "INFO"},
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
     "loggers": {
         "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "httpx": {"level": "WARNING"},

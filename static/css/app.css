@@ -268,7 +268,9 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 
 /* ---- Filters + matches workspace --------------------------------------------- */
 
-.workspace { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 24px; }
+/* Filters come first in the markup (and on a phone, on top), but sit on the right
+   on wide screens: row-reverse puts the first item at the right end of the row. */
+.workspace { display: flex; flex-direction: row-reverse; flex-wrap: wrap; align-items: flex-start; gap: 24px; }
 .workspace > :first-child { flex: 1 1 300px; min-width: 0; }
 .matches { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 

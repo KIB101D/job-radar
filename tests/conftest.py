@@ -6,6 +6,28 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """
+    Tests never reach the internet. Every HTTP call goes through a MockTransport;
+    a real one is refused and fails the test, even when the code under test
+    catches the error (a failed fetch is handled quietly by design). CI has
+    network and a sandbox may not, and results must not depend on that.
+    """
+    import httpx
+
+    attempts: list[str] = []
+
+    def refuse(self, request):
+        attempts.append(f"{request.method} {request.url}")
+        raise httpx.ConnectError("network access is blocked in tests", request=request)
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", refuse)
+    yield
+    if attempts:
+        pytest.fail(f"Real network access in a test: {attempts}")
+
+
+@pytest.fixture(autouse=True)
 def _empty_cache():
     """The hero radar caches its picks; every test starts without them."""
     from django.core.cache import cache

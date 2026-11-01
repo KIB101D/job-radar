@@ -229,8 +229,13 @@ def test_check_now_sends_only_new_undelivered_matches(send, linked, make_vacancy
 
 
 def test_check_now_nothing_new_shows_next_notification(send, linked):
-    fresh_sources()
     with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
+        # Everything relative to the travelled-to moment, not to when the suite runs:
+        # sources fresh (no fetch), chat linked an hour ago.
+        fresh_sources()
+        Subscription.objects.filter(pk=linked.pk).update(
+            linked_at=timezone.now() - timedelta(hours=1)
+        )
         tg = send(message_update("/check"))
     assert tg.last_text() == "Нових вакансій немає. Наступне автосповіщення о 18:00."
 

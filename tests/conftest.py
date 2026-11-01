@@ -128,11 +128,11 @@ def tg(monkeypatch):
     """Replace the Telegram client with one whose HTTP goes to FakeTelegram."""
     import httpx
 
-    from bot import digests, handlers, sync, telegram
+    from bot import digests, handlers, panel, telegram
 
     fake = FakeTelegram()
     client = telegram.TelegramClient("123:test-token", transport=httpx.MockTransport(fake.handler))
-    for module in (telegram, handlers, sync, digests):
+    for module in (telegram, handlers, panel, digests):
         monkeypatch.setattr(module, "get_client", lambda: client)
     from bot.management.commands import run_bot_locally, set_telegram_webhook
 

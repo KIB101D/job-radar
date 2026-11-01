@@ -26,3 +26,21 @@ class ProcessedUpdate(models.Model):
         cutoff = timezone.now() - timedelta(days=cls.KEEP_FOR_DAYS)
         deleted, _ = cls.objects.filter(processed_at__lt=cutoff).delete()
         return deleted
+
+
+class ChatState(models.Model):
+    """
+    Bot UI state for one chat (not a domain concept, so not on Subscription).
+
+    The settings panel is ONE message that is edited in place as you move between
+    its screens. We remember which message it is and which screen it shows, so
+    reopening the panel can replace it and the website can update it.
+    """
+
+    chat_id = models.BigIntegerField(primary_key=True)
+    panel_message_id = models.BigIntegerField(null=True, blank=True)
+    panel_screen = models.CharField(max_length=20, default="main")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"chat {self.chat_id}: {self.panel_screen}"

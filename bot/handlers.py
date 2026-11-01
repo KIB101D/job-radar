@@ -19,10 +19,10 @@ from subscriptions.delivery import (
     newest_matches,
     unlink_chat,
 )
-from subscriptions.models import Frequency, Subscription
+from subscriptions.models import Subscription
 
-from . import keyboards, texts
-from .formatting import filters_summary, is_public_url, radar_url, vacancy_list
+from . import keyboards, panel, texts
+from .formatting import filters_summary, radar_url, vacancy_list
 from .services import check_now
 from .telegram import TelegramError, get_client
 
@@ -75,10 +75,18 @@ def handle_message(message: dict) -> None:
         return
 
     action = ACTIONS.get(command) or ACTIONS.get(text)
-    if action is None:
-        get_client().send_message(chat_id, texts.UNKNOWN, keyboards.main_menu(subscription))
+    if action is not None:
+        if getattr(action, "wants_message_id", False):
+            action(subscription, message.get("message_id"))
+        else:
+            action(subscription)
         return
-    action(subscription)
+    # Plain text while the panel shows a word list = words to add.
+    if not text.startswith("/") and panel.handle_text(
+        subscription, text, message.get("message_id")
+    ):
+        return
+    get_client().send_message(chat_id, texts.UNKNOWN, keyboards.main_menu(subscription))
 
 
 # --- /start ------------------------------------------------------------------------------
@@ -103,13 +111,13 @@ def start(chat_id: int, token: str) -> None:
         welcome_back(subscription)
         return
 
-    # 1. Welcome + the persistent menu, 2. first batch, 3. frequency choice.
+    # 1. Welcome + the persistent menu, 2. first batch, 3. frequency (in the panel).
     summary = filters_summary(filters_for(subscription))
     client.send_message(
         chat_id, texts.WELCOME.format(filters=summary), keyboards.main_menu(subscription)
     )
     send_batch(subscription, offset=0, size=FIRST_BATCH_SIZE)
-    send_frequency(subscription)
+    panel.open_panel(subscription, "freq")  # step 3 of the design: choose the frequency
 
 
 def welcome_back(subscription: Subscription) -> None:
@@ -184,50 +192,8 @@ def do_latest(subscription: Subscription) -> None:
     mark_delivered(subscription, page.vacancies)
 
 
-def send_frequency(subscription: Subscription) -> None:
-    message = get_client().send_message(
-        subscription.chat_id,
-        frequency_text(subscription),
-        keyboards.frequency_keyboard(subscription),
-    )
-    remember_settings_message(subscription, message["message_id"])
-
-
-def remember_settings_message(subscription: Subscription, message_id: int) -> None:
-    """The site edits this message when settings change there (see bot/sync.py)."""
-    if subscription.settings_message_id != message_id:
-        subscription.settings_message_id = message_id
-        subscription.save(update_fields=["settings_message_id"])
-
-
-def frequency_text(subscription: Subscription) -> str:
-    lines = [
-        texts.FREQUENCY_TITLE,
-        texts.FREQUENCY_CURRENT.format(label=subscription.get_frequency_display()),
-    ]
-    when = schedule.next_slot_label(subscription)
-    if subscription.paused:
-        lines.append(texts.FREQUENCY_PAUSED.format(button=texts.BTN_RESUME))
-    elif when:
-        lines.append(
-            texts.FREQUENCY_NEXT.format(when=when, tz=schedule.timezone_label(subscription))
-        )
-    else:
-        lines.append(texts.FREQUENCY_OFF_HINT.format(button=texts.BTN_CHECK))
-    if subscription.frequency != Frequency.OFF:
-        if subscription.quiet_hours_enabled:
-            lines.append(
-                texts.QUIET_ON.format(
-                    start=f"{subscription.quiet_hours_start:02d}:00",
-                    end=f"{subscription.quiet_hours_end:02d}:00",
-                )
-            )
-        else:
-            lines.append(texts.QUIET_OFF)
-    return "\n".join(lines)
-
-
 def set_paused(subscription: Subscription, paused: bool) -> None:
+    """A new message (an event worth seeing), plus the panel shows the new state."""
     subscription.paused = paused
     subscription.save(update_fields=["paused", "updated_at"])
     if subscription.paused:
@@ -235,18 +201,17 @@ def set_paused(subscription: Subscription, paused: bool) -> None:
     else:
         text = f"{texts.RESUMED}\n{next_notification_line(subscription)}"
     get_client().send_message(subscription.chat_id, text, keyboards.main_menu(subscription))
+    panel.refresh_panel(subscription)
 
 
-def send_filters_link(subscription: Subscription) -> None:
-    url = radar_url(subscription)
-    if is_public_url(url):
-        get_client().send_message(
-            subscription.chat_id,
-            texts.FILTERS_LINK,
-            keyboards.url_keyboard(texts.FILTERS_BUTTON, url),
-        )
-    else:  # local development: Telegram won't accept a localhost button
-        get_client().send_message(subscription.chat_id, texts.FILTERS_LINK_PLAIN.format(url=url))
+def open_screen(screen: str):
+    """Menu/command handler that (re)opens the settings panel on `screen`."""
+
+    def handler(subscription: Subscription, message_id: int | None = None) -> None:
+        panel.open_panel(subscription, screen, tap_message_id=message_id)
+
+    handler.wants_message_id = True
+    return handler
 
 
 def send_help(chat_id: int) -> None:
@@ -266,14 +231,17 @@ ACTIONS = {
     texts.BTN_CHECK: do_check,
     "/latest": do_latest,
     texts.BTN_LATEST: do_latest,
-    "/frequency": send_frequency,
-    texts.BTN_FREQUENCY: send_frequency,
+    "/settings": open_screen("main"),
+    texts.BTN_SETTINGS: open_screen("main"),
+    "/filters": open_screen("filters"),
+    "/frequency": open_screen("freq"),
+    # Buttons of the previous menu, still on screen in chats linked before it changed.
+    texts.BTN_FILTERS: open_screen("filters"),
+    texts.BTN_FREQUENCY: open_screen("freq"),
     # Menu buttons are explicit, so an outdated keyboard can't do the opposite.
     "/pause": lambda sub: set_paused(sub, not sub.paused),
     texts.BTN_PAUSE: lambda sub: set_paused(sub, True),
     texts.BTN_RESUME: lambda sub: set_paused(sub, False),
-    "/filters": send_filters_link,
-    texts.BTN_FILTERS: send_filters_link,
     "/stop": stop,
 }
 
@@ -293,33 +261,16 @@ def handle_callback(callback: dict) -> None:
         return
 
     kind, _, value = data.partition(":")
-    answer = None
-    if kind == "freq" and value in Frequency.values:
-        subscription.frequency = value
-        subscription.save(update_fields=["frequency", "updated_at"])
-        refresh_frequency_message(subscription, message)
-        answer = texts.FREQUENCY_SAVED
-    elif kind == "quiet" and value in ("on", "off"):
-        subscription.quiet_hours_enabled = value == "on"
-        subscription.save(update_fields=["quiet_hours_enabled", "updated_at"])
-        refresh_frequency_message(subscription, message)
-        answer = texts.FREQUENCY_SAVED
-    elif kind == "more" and value.isdigit():
+    if kind == "more" and value.isdigit():
         client.remove_inline_keyboard(chat_id, message["message_id"])
         send_batch(subscription, offset=int(value), size=MORE_BATCH_SIZE)
-    else:
+        client.answer_callback_query(callback["id"])
+        return
+
+    answer = panel.handle_callback(subscription, data, message["message_id"])
+    if answer is None:  # not a button we know (old or tampered callback_data)
         answer = texts.CALLBACK_EXPIRED
-    client.answer_callback_query(callback["id"], answer)
-
-
-def refresh_frequency_message(subscription: Subscription, message: dict) -> None:
-    get_client().edit_message_text(
-        subscription.chat_id,
-        message["message_id"],
-        frequency_text(subscription),
-        keyboards.frequency_keyboard(subscription),
-    )
-    remember_settings_message(subscription, message["message_id"])
+    client.answer_callback_query(callback["id"], answer or None)
 
 
 # --- membership ----------------------------------------------------------------------------------

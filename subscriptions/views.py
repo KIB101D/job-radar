@@ -205,6 +205,7 @@ def detail(request, token: str):
         form = FiltersForm(request.POST)
         if form.is_valid():
             form.save(subscription)
+            _sync_bot(subscription)
             messages.success(request, "Фільтри збережено.")
             return redirect("subscriptions:detail", subscription.token)
     else:

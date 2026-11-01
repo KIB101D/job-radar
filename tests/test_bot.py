@@ -155,7 +155,9 @@ def test_start_with_token_links_chat_and_sends_welcome_batch_and_frequency(send,
     assert batch["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == "more:5"
     assert batch["parse_mode"] == "HTML"
     assert "Як часто надсилати нове?" in frequency["text"]
-    assert len(frequency["reply_markup"]["inline_keyboard"]) == 4  # 3 rows of 2 + quiet hours
+    rows = frequency["reply_markup"]["inline_keyboard"]
+    assert len(rows) == 5  # 3 rows of 2 + quiet hours + back to the panel
+    assert rows[-1][0]["callback_data"] == "nav:main"
     assert Delivery.objects.filter(subscription=sub).count() == 5
 
 
@@ -313,17 +315,18 @@ def test_vacancy_html_is_escaped(send, linked, make_vacancy):
     assert "Python &lt;script&gt; &amp; co" in text and "A&amp;B &lt;Ltd&gt;" in text
 
 
-def test_filters_link_is_button_on_https(send, linked, settings):
+def test_site_link_is_a_button_on_https(send, linked, settings):
     settings.SITE_URL = "https://radar.example.com"
-    payload = send(message_update(texts.BTN_FILTERS)).sent()[-1]
-    button = payload["reply_markup"]["inline_keyboard"][0][0]
-    assert button["url"] == f"https://radar.example.com/s/{linked.token}/"
+    payload = send(message_update(texts.BTN_SETTINGS)).sent()[-1]
+    urls = [b.get("url") for row in payload["reply_markup"]["inline_keyboard"] for b in row]
+    assert f"https://radar.example.com/s/{linked.token}/" in urls
 
 
-def test_filters_link_is_plain_text_on_localhost(send, linked, settings):
+def test_site_link_is_plain_text_on_localhost(send, linked, settings):
     settings.SITE_URL = "http://localhost:8000"
-    payload = send(message_update("/filters")).sent()[-1]
-    assert "reply_markup" not in payload
+    payload = send(message_update("/settings")).sent()[-1]
+    buttons = [b for row in payload["reply_markup"]["inline_keyboard"] for b in row]
+    assert not any("url" in b for b in buttons)
     assert f"http://localhost:8000/s/{linked.token}/" in payload["text"]
 
 
@@ -389,7 +392,7 @@ def test_pressing_selected_frequency_again_is_fine(send, linked, tg):
 
 def test_quiet_hours_button_switches_to_what_it_says(send, linked):
     payload = send(message_update(texts.BTN_FREQUENCY)).sent()[-1]
-    assert payload["reply_markup"]["inline_keyboard"][-1][0]["callback_data"] == "quiet:off"
+    assert payload["reply_markup"]["inline_keyboard"][-2][0]["callback_data"] == "quiet:off"
 
     tg = send(callback_update("quiet:off"))
     linked.refresh_from_db()
@@ -615,10 +618,17 @@ def site_post(client, sub, **data):
     return client.post(reverse("subscriptions:notifications", args=[sub.token]), data)
 
 
-def test_bot_remembers_its_settings_message(send, linked):
+def panel_state():
+    from bot.models import ChatState
+
+    return ChatState.objects.filter(chat_id=CHAT).first()
+
+
+def test_bot_remembers_its_panel(send, linked):
     tg = send(message_update(texts.BTN_FREQUENCY))
-    linked.refresh_from_db()
-    assert linked.settings_message_id == tg._next_id  # the id Telegram gave that message
+    state = panel_state()
+    assert state.panel_message_id == tg._next_id  # the id Telegram gave that message
+    assert state.panel_screen == "freq"
 
 
 def test_site_change_edits_the_settings_message_in_telegram(client, send, linked):
@@ -638,8 +648,19 @@ def test_site_change_edits_the_settings_message_in_telegram(client, send, linked
 def test_site_quiet_hours_change_updates_the_button(client, send, linked):
     tg = send(message_update(texts.BTN_FREQUENCY))
     site_post(client, linked, changed="quiet_hours_enabled")  # unchecked
-    quiet_button = tg.sent("editMessageText")[-1]["reply_markup"]["inline_keyboard"][-1][0]
+    quiet_button = tg.sent("editMessageText")[-1]["reply_markup"]["inline_keyboard"][-2][0]
     assert quiet_button == {"text": texts.QUIET_BUTTON_OFF, "callback_data": "quiet:on"}
+
+
+def test_site_filter_change_updates_the_panel(client, send, linked):
+    tg = send(message_update("/filters"))
+    panel_id = tg._next_id
+    client.post(
+        reverse("subscriptions:detail", args=[linked.token]),
+        {"include_keywords": "django, fastapi", "categories": ["Python"]},
+    )
+    edit = tg.sent("editMessageText")[-1]
+    assert "django, fastapi" in edit["text"] and edit["message_id"] == panel_id
 
 
 def test_step3_save_also_updates_telegram(client, send, linked):
@@ -651,14 +672,14 @@ def test_step3_save_also_updates_telegram(client, send, linked):
     assert "Раз на день" in tg.sent("editMessageText")[-1]["text"]
 
 
-def test_no_settings_message_means_no_telegram_call(client, linked, tg):
+def test_no_panel_means_no_telegram_call(client, linked, tg):
     site_post(client, linked, changed="frequency", frequency="hourly")
     linked.refresh_from_db()
     assert linked.frequency == Frequency.HOURLY
     assert tg.sent("editMessageText") == []
 
 
-def test_deleted_settings_message_is_forgotten(client, send, linked):
+def test_deleted_panel_is_forgotten(client, send, linked):
     tg = send(message_update(texts.BTN_FREQUENCY))
     tg.fail_next("editMessageText", 400, "Bad Request: message to edit not found")
 
@@ -666,7 +687,7 @@ def test_deleted_settings_message_is_forgotten(client, send, linked):
 
     linked.refresh_from_db()
     assert linked.frequency == Frequency.HOURLY  # the site still saved
-    assert linked.settings_message_id is None
+    assert panel_state().panel_message_id is None
 
 
 def test_telegram_outage_does_not_break_the_site(client, send, linked):
@@ -677,13 +698,12 @@ def test_telegram_outage_does_not_break_the_site(client, send, linked):
 
     linked.refresh_from_db()
     assert response.status_code == 200 and linked.frequency == Frequency.HOURLY
-    assert linked.settings_message_id is not None  # kept: it may work next time
+    assert panel_state().panel_message_id is not None  # kept: it may work next time
 
 
-def test_pressing_buttons_in_older_message_makes_it_the_tracked_one(send, linked):
+def test_pressing_buttons_in_older_message_makes_it_the_panel(send, linked):
     send(callback_update("freq:daily", message_id=55))
-    linked.refresh_from_db()
-    assert linked.settings_message_id == 55
+    assert panel_state().panel_message_id == 55
 
 
 def test_site_forms_save_only_their_own_columns(client, linked):

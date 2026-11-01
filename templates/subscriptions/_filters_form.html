@@ -1,13 +1,16 @@
 {% load radar_ui %}{% comment %}
-  Filter form card. Keyword fields are plain comma-separated inputs that
-  static/js/app.js turns into removable chips.
+  Filters: a bare header (aligned with "Збіги" next to it), then one panel. Keywords
+  are always open; the other groups fold into one line each with the current choice
+  ("Рівень · Junior"), filled in by static/js/app.js, so the panel fits the screen
+  and stays next to the list. Keyword fields are plain comma-separated inputs that
+  app.js turns into removable chips.
   - With a radar (subscription): every change is saved at once, one field per
     request (views.detail), and the bot's settings message is updated.
   - Without one (/filters/): changes only preview the matches; the button creates
     the radar.
 
   Params: form, subscription (optional), submit_label, submit_hint.
-{% endcomment %}<form method="post" class="panel filters" novalidate
+{% endcomment %}<form method="post" class="filters" novalidate
       aria-label="Фільтри вакансій"
 {% if subscription %}
       data-autosave
@@ -23,83 +26,92 @@
   {% csrf_token %}
   {{ form.timezone }}
 
-  <div class="filters-head">
-    <h3 class="filters-title">{% include "components/icons.html" with name="sliders" %}Параметри</h3>
+  <div class="col-head filters-head">
+    <h2 class="col-title">Параметри</h2>
+    {% if subscription %}{% include "subscriptions/_save_status.html" %}{% endif %}
     <button type="button" class="link-btn" data-reset-filters>Скинути</button>
   </div>
 
-  {% if form.non_field_errors %}<p class="field-error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+  <div class="panel filters-body">
+    {% if form.non_field_errors %}<p class="field-error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
 
-  <div class="field">
-    <label class="field-label" for="{{ form.include_keywords.id_for_label }}">{{ form.include_keywords.label }}</label>
-    <div class="chips-field" data-chips>{{ form.include_keywords }}</div>
-    <p class="field-help">{{ form.include_keywords.help_text }}</p>
-    {% for error in form.include_keywords.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </div>
-
-  <div class="field">
-    <label class="field-label" for="{{ form.exclude_keywords.id_for_label }}">{{ form.exclude_keywords.label }}</label>
-    <div class="chips-field chips-exclude" data-chips>{{ form.exclude_keywords }}</div>
-    {% for error in form.exclude_keywords.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </div>
-
-  <fieldset class="field">
-    <legend class="field-label">{{ form.categories.label }}</legend>
-    <div class="toggle-chips">
-      {% for choice in form.categories %}
-        <label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
-      {% endfor %}
+    <div class="field">
+      <label class="field-label" for="{{ form.include_keywords.id_for_label }}">{{ form.include_keywords.label }}</label>
+      <div class="chips-field" data-chips>{{ form.include_keywords }}</div>
+      <p class="field-help">{{ form.include_keywords.help_text }}</p>
+      {% for error in form.include_keywords.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
     </div>
-    <p class="field-help">{{ form.categories.help_text }}</p>
-    {% for error in form.categories.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </fieldset>
 
-  <fieldset class="field">
-    <legend class="field-label">{{ form.levels.label }}</legend>
-    <div class="toggle-chips">
-      {% for choice in form.levels %}
-        <label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
-      {% endfor %}
+    <div class="field">
+      <label class="field-label" for="{{ form.exclude_keywords.id_for_label }}">{{ form.exclude_keywords.label }}</label>
+      <div class="chips-field chips-exclude" data-chips>{{ form.exclude_keywords }}</div>
+      {% for error in form.exclude_keywords.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
     </div>
-    <p class="field-help">{{ form.levels.help_text }}</p>
-  </fieldset>
 
-  <fieldset class="field">
-    <legend class="field-label">{{ form.cities.label }}</legend>
-    <div class="toggle-chips">
-      <label class="toggle-chip">{{ form.remote_only }}<span>{{ form.remote_only.label }}</span></label>
-      {% for choice in form.cities %}
-        <label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
-      {% endfor %}
+    <div class="fgroups">
+      <details class="fgroup"{% if form.categories.errors %} open{% endif %}>
+        <summary><span class="fgroup-label">{{ form.categories.label }}</span><span class="fgroup-value" data-empty="усі"></span></summary>
+        <div class="fgroup-body">
+          <div class="toggle-chips">
+            {% for choice in form.categories %}<label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}
+          </div>
+          <p class="field-help">{{ form.categories.help_text }}</p>
+          {% for error in form.categories.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+      </details>
+
+      <details class="fgroup">
+        <summary><span class="fgroup-label">{{ form.levels.label }}</span><span class="fgroup-value" data-empty="будь-який"></span></summary>
+        <div class="fgroup-body">
+          <div class="toggle-chips">
+            {% for choice in form.levels %}<label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}
+          </div>
+          <p class="field-help">{{ form.levels.help_text }}</p>
+        </div>
+      </details>
+
+      <details class="fgroup"{% if form.cities.errors %} open{% endif %}>
+        <summary><span class="fgroup-label">{{ form.cities.label }}</span><span class="fgroup-value" data-empty="будь-де"></span></summary>
+        <div class="fgroup-body">
+          <div class="toggle-chips">
+            <label class="toggle-chip">{{ form.remote_only }}<span>{{ form.remote_only.label }}</span></label>
+            {% for choice in form.cities %}<label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}
+          </div>
+          <p class="field-help">{{ form.cities.help_text }} Нічого не вибрано: будь-де.</p>
+          {% for error in form.cities.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+      </details>
+
+      <details class="fgroup">
+        <summary><span class="fgroup-label">{{ form.salary_min.label }}</span><span class="fgroup-value" data-empty="будь-яка"></span></summary>
+        <div class="fgroup-body">
+          <label class="sr-only" for="{{ form.salary_min.id_for_label }}">Мінімальна зарплата</label>
+          <select name="salary_min" id="{{ form.salary_min.id_for_label }}" class="select" data-default="0">
+            {% for value, label in form.fields.salary_min.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.salary_min.value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <label class="check check-sm">{{ form.salary_unknown }}<span>{{ form.salary_unknown.label }}</span></label>
+          <p class="field-help">Зарплату на DOU вказує лише частина вакансій.</p>
+        </div>
+      </details>
+
+      <details class="fgroup">
+        <summary><span class="fgroup-label">{{ form.max_age_days.label }}</span><span class="fgroup-value" data-empty="за весь час"></span></summary>
+        <div class="fgroup-body">
+          <label class="sr-only" for="{{ form.max_age_days.id_for_label }}">Показувати вакансії</label>
+          <select name="max_age_days" id="{{ form.max_age_days.id_for_label }}" class="select" data-default="0">
+            {% for value, label in form.fields.max_age_days.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.max_age_days.value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <p class="field-help">{{ form.max_age_days.help_text }}</p>
+        </div>
+      </details>
     </div>
-    <p class="field-help">{{ form.cities.help_text }} Нічого не вибрано: будь-де.</p>
-    {% for error in form.cities.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </fieldset>
 
-  <div class="field">
-    <label class="field-label" for="{{ form.salary_min.id_for_label }}">{{ form.salary_min.label }}</label>
-    <select name="salary_min" id="{{ form.salary_min.id_for_label }}" class="select" data-default="0">
-      {% for value, label in form.fields.salary_min.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.salary_min.value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-    <label class="check check-sm">{{ form.salary_unknown }}<span>{{ form.salary_unknown.label }}</span></label>
-    <p class="field-help">Зарплату на DOU вказує лише частина вакансій.</p>
+    {% if not subscription %}
+    <div class="filters-submit">
+      <button type="submit" class="btn btn-primary btn-block">{{ submit_label }}</button>
+      <p class="field-help center">{{ submit_hint }}</p>
+    </div>
+    {% endif %}
   </div>
-
-  <div class="field">
-    <label class="field-label" for="{{ form.max_age_days.id_for_label }}">{{ form.max_age_days.label }}</label>
-    <select name="max_age_days" id="{{ form.max_age_days.id_for_label }}" class="select" data-default="0">
-      {% for value, label in form.fields.max_age_days.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.max_age_days.value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-    <p class="field-help">{{ form.max_age_days.help_text }}</p>
-  </div>
-
-  {% if subscription %}
-  {% include "subscriptions/_save_status.html" %}
-  <noscript><button type="submit" class="btn btn-primary btn-block">Зберегти фільтри</button></noscript>
-  {% else %}
-  <div class="filters-submit">
-    <button type="submit" class="btn btn-primary btn-block">{{ submit_label }}</button>
-    <p class="field-help center">{{ submit_hint }}</p>
-  </div>
-  {% endif %}
+  {% if subscription %}<noscript><button type="submit" class="btn btn-primary btn-block">Зберегти фільтри</button></noscript>{% endif %}
 </form>

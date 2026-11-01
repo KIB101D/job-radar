@@ -11,7 +11,9 @@
       <p class="lead">Змінюй фільтри, і збіги оновляться одразу. Збережи їх, щоб радар запам'ятав пошук, а Telegram-бот надсилав саме такі вакансії.</p>
     </div>
     <div class="workspace">
-      {% include "subscriptions/_filters_form.html" with submit_label="Створити радар" submit_hint="Після цього можна підключити Telegram-бота" %}
+      <div class="workspace-side">
+        {% include "subscriptions/_filters_form.html" with submit_label="Створити радар" submit_hint="Після цього можна підключити Telegram-бота" %}
+      </div>
       {% include "subscriptions/_matches.html" %}
     </div>
   </div>

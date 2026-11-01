@@ -140,7 +140,28 @@
       .querySelectorAll('input[type="checkbox"]')
       .forEach((box) => (box.checked = box.hasAttribute("data-default-checked")));
     form.querySelectorAll("select[data-default]").forEach((select) => (select.value = select.dataset.default));
+    form.querySelectorAll(".fgroup").forEach(summarize);
     form.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // --- Folded filter groups ---------------------------------------------------------------
+  // <details class="fgroup"> shows the current choice next to its name ("Рівень  Junior").
+
+  function summarize(group) {
+    const value = group.querySelector(".fgroup-value");
+    if (!value) return;
+    const select = group.querySelector("select");
+    let text = "";
+    if (select) {
+      if (select.value !== (select.dataset.default ?? "")) text = select.selectedOptions[0]?.textContent || "";
+    } else {
+      text = [...group.querySelectorAll("input[type=checkbox]:checked")]
+        .map((box) => box.nextElementSibling?.textContent.trim())
+        .filter(Boolean)
+        .join(", ");
+    }
+    value.textContent = text || value.dataset.empty || "";
+    value.classList.toggle("is-set", Boolean(text));
   }
 
   // --- Copy to clipboard ------------------------------------------------------------------
@@ -161,6 +182,7 @@
 
   function enhance(scope) {
     scope.querySelectorAll("[data-chips]").forEach(initChips);
+    scope.querySelectorAll(".fgroup").forEach(summarize);
     if (browserTimezone) {
       scope.querySelectorAll("input[data-timezone]").forEach((input) => (input.value = browserTimezone));
     }
@@ -176,6 +198,11 @@
     if (event.target.closest("[data-toast-close]")) {
       event.target.closest("[data-toast]")?.remove();
     }
+  });
+
+  document.addEventListener("change", (event) => {
+    const group = event.target.closest?.(".fgroup");
+    if (group) summarize(group);
   });
 
   document.addEventListener("DOMContentLoaded", () => {

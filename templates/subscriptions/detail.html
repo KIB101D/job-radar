@@ -11,7 +11,7 @@
       <p class="lead lead-note">*бот у Telegram шукає за тими самими фільтрами</p>
     </div>
     <div class="workspace">
-      <div class="stack">
+      <div class="workspace-side">
         {% include "subscriptions/_filters_box.html" %}
         {% if not subscription.is_linked %}
           <p class="page-hint">{% include "components/icons.html" with name="telegram" %}<span>Хочеш отримувати нові збіги в Telegram? <a href="{% url 'subscriptions:radar_bot' subscription.token %}">Підключи бота</a>, це один клік.</span></p>

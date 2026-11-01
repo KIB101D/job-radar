@@ -269,19 +269,61 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 
 /* ---- Filters + matches workspace --------------------------------------------- */
 
-/* Filters come first in the markup (and on a phone, on top), but sit on the right
-   on wide screens: row-reverse puts the first item at the right end of the row. */
-.workspace { display: flex; flex-direction: row-reverse; flex-wrap: wrap; align-items: flex-start; gap: 24px; }
-.workspace > :first-child { flex: 1 1 300px; min-width: 0; }
-.matches { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+/* Two columns on wide screens: matches on the left, filters on the right. Both
+   start with a bare header of the same height, so the first card and the filters
+   panel line up. The filters come first in the markup (on a phone they're on top)
+   and stick next to the list while it scrolls. */
+.workspace { display: flex; flex-direction: column; gap: 32px; }
+.workspace-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.matches { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+@media (min-width: 960px) {
+  .workspace {
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "main side";
+    align-items: start; gap: 32px;
+  }
+  .matches { grid-area: main; }
+  .workspace-side {
+    grid-area: side; position: sticky; top: 20px;
+    max-height: calc(100vh - 40px); overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+.col-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.col-title { margin: 0; font: 600 24px/1.2 var(--font-display); letter-spacing: -0.01em; }
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 20px; }
 
-.filters { display: flex; flex-direction: column; gap: 22px; }
-.filters-head { display: flex; align-items: center; justify-content: space-between; }
-.filters-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; }
-.filters-title .icon { color: var(--muted); }
-.save-status { display: flex; align-items: center; gap: 6px; min-height: 20px; margin-top: -4px; font-size: 13px; color: var(--lime); }
+.filters { display: flex; flex-direction: column; gap: 14px; }
+.filters-body { display: flex; flex-direction: column; gap: 20px; }
+
+/* Folding filter groups: "Рівень · Junior" on one line, chips inside. */
+.fgroups { display: flex; flex-direction: column; border-top: 1px solid var(--border); margin-inline: -20px; }
+.fgroup { border-bottom: 1px solid var(--border); }
+.fgroup summary {
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 20px;
+  list-style: none; cursor: pointer; font-size: 14px;
+}
+.fgroup summary::-webkit-details-marker { display: none; }
+.fgroup summary::after {
+  content: ""; flex-shrink: 0; width: 8px; height: 8px; margin-left: 2px;
+  border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
+  transform: translateY(-2px) rotate(45deg); transition: transform 0.15s;
+}
+.fgroup[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+.fgroup summary:hover .fgroup-label { color: var(--text); }
+.fgroup summary:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; border-radius: 6px; }
+.fgroup-label { color: var(--text-soft); font-weight: 500; flex-shrink: 0; }
+.fgroup-value {
+  flex: 1; min-width: 0; text-align: right; color: var(--faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fgroup-value.is-set { color: var(--lime); }
+.fgroup-body { display: flex; flex-direction: column; gap: 10px; padding: 2px 20px 18px; }
+.fgroups:last-child { margin-bottom: -20px; }  /* the last fold closes the panel */
+.fgroups:last-child .fgroup:last-child { border-bottom: 0; }
+.save-status { display: flex; align-items: center; gap: 4px; margin-left: auto; font-size: 13px; color: var(--lime); }
+.save-status + .link-btn { margin-left: 4px; }
 .save-status.is-error { color: var(--red-text); }
 .save-status:not(.is-error):not(:empty) { animation: fade-out 0.5s ease 2.5s forwards; }
 @keyframes fade-out { to { opacity: 0; } }
@@ -358,7 +400,6 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 /* Matches header */
 .matches-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .matches-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.matches-title-row .h3 { font-size: 24px; }
 .count-pill { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--text); }
 .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .live-label { color: var(--lime); font-weight: 600; }
@@ -384,33 +425,33 @@ button.segmented-item:hover { color: var(--text); }
 #matches.htmx-request .results { opacity: 0.6; transition: opacity 0.15s; }
 
 /* Cards */
-.results { display: flex; flex-direction: column; gap: 14px; }
+.results { display: flex; flex-direction: column; gap: 10px; }
 .card {
-  display: flex; flex-direction: column; gap: 12px; padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 8px; padding: 16px 18px 12px;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  transition: border-color 0.15s;
 }
-.card.is-new { border-color: var(--new-border); }
+.card:hover { border-color: var(--border-btn); }
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.card-heading { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.card-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.card-title { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; }
+.card-title { margin: 0; min-width: 0; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.card-title .badge-new { margin-right: 10px; vertical-align: 2px; }
 .card-title a { color: var(--text); text-decoration: none; }
 .card-title a:hover { color: var(--lime); }
-.card-company { font-size: 14px; color: var(--muted); }
+.card-company { color: var(--text-soft); }
 .card-time { font-size: 12px; color: var(--faint); white-space: nowrap; }
 .badge-new {
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--on-lime); background: var(--lime); padding: 2px 8px; border-radius: 6px;
 }
-.card-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: var(--muted); }
+.card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 14px; color: var(--muted); }
 .card-place { display: inline-flex; align-items: center; gap: 6px; }
 .card-place .icon { color: var(--faint); }
 .card-salary { color: var(--text); }
-.card-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.card-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { font-size: 12px; padding: 3px 9px; border-radius: 6px; background: var(--chip); color: var(--text-soft); }
 .card-link {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 0 0 12px;
   font-size: 14px; font-weight: 500; text-decoration: none;
 }
 .card.is-seen .card-title a, .card.is-seen .card-company { color: var(--faint); }
@@ -425,7 +466,7 @@ button.segmented-item:hover { color: var(--text); }
 .more { margin-top: 2px; font-weight: 400; }
 
 /* Fresh feed */
-.feed { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.feed { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
 .feed-title { margin: 0 0 4px; font: 600 18px/1.3 var(--font-display); }
 .feed-list { list-style: none; margin: 12px 0 0; padding: 0; }
 .feed-item {

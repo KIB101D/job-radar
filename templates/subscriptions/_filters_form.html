@@ -1,17 +1,26 @@
 {% load radar_ui %}{% comment %}
-  Filter form card. Changes refresh the matches next to it (preview, not saved);
-  the submit button saves. Keyword fields are plain comma-separated inputs that
+  Filter form card. Keyword fields are plain comma-separated inputs that
   static/js/app.js turns into removable chips.
+  - With a radar (subscription): every change is saved at once, one field per
+    request (views.detail), and the bot's settings message is updated.
+  - Without one (/filters/): changes only preview the matches; the button creates
+    the radar.
 
-  Params: form, submit_label, subscription (optional).
+  Params: form, subscription (optional), submit_label, submit_hint.
 {% endcomment %}<form method="post" class="panel filters" novalidate
       aria-label="Фільтри вакансій"
+{% if subscription %}
+      data-autosave
+      hx-post="{% url 'subscriptions:detail' subscription.token %}"
+      hx-trigger="change" hx-sync="this:queue all"
+      hx-vals='js:{changed: event.target.name || ""}'
+{% else %}
       hx-get="{% url 'subscriptions:preview' %}"
       hx-trigger="change delay:150ms"
+{% endif %}
       hx-target="#results" hx-swap="outerHTML"
       hx-indicator="#matches">
   {% csrf_token %}
-  {% if subscription %}<input type="hidden" name="token" value="{{ subscription.token }}">{% endif %}
   {{ form.timezone }}
 
   <div class="filters-head">
@@ -47,8 +56,13 @@
 
   <label class="check">{{ form.remote_only }}<span>{{ form.remote_only.label }}</span></label>
 
+  {% if subscription %}
+  {% include "subscriptions/_save_status.html" %}
+  <noscript><button type="submit" class="btn btn-primary btn-block">Зберегти фільтри</button></noscript>
+  {% else %}
   <div class="filters-submit">
     <button type="submit" class="btn btn-primary btn-block">{{ submit_label }}</button>
     <p class="field-help center">{{ submit_hint }}</p>
   </div>
+  {% endif %}
 </form>

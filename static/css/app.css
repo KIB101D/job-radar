@@ -281,6 +281,10 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 .filters-head { display: flex; align-items: center; justify-content: space-between; }
 .filters-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; }
 .filters-title .icon { color: var(--muted); }
+.save-status { display: flex; align-items: center; gap: 6px; min-height: 20px; margin-top: -4px; font-size: 13px; color: var(--lime); }
+.save-status.is-error { color: var(--red-text); }
+.save-status:not(.is-error):not(:empty) { animation: fade-out 0.5s ease 2.5s forwards; }
+@keyframes fade-out { to { opacity: 0; } }
 .filters-submit { display: flex; flex-direction: column; gap: 6px; }
 .center { text-align: center; }
 
@@ -605,5 +609,5 @@ button.segmented-item:hover { color: var(--text); }
 @keyframes toast-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .r-sweep, .r-hit, .r-hit > *, .r-label-in, .r-label-pulse, .pulse, .waiting-ping, .toast { animation: none; }
+  .r-sweep, .r-hit, .r-hit > *, .r-label-in, .r-label-pulse, .save-status, .pulse, .waiting-ping, .toast { animation: none; }
 }

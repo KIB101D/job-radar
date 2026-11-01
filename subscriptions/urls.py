@@ -20,6 +20,7 @@ urlpatterns = [
     path("preview/", views.preview, name="preview"),
     path("feed/", views.feed, name="feed"),
     path("s/<str:token>/results/", views.results, name="results"),
+    path("s/<str:token>/filters-form/", views.filters_form, name="filters_form"),
     path("s/<str:token>/live/", views.live, name="live"),
     path("s/<str:token>/link-status/", views.link_status, name="link_status"),
     path("s/<str:token>/next-slot/", views.next_slot, name="next_slot"),

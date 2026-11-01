@@ -8,22 +8,29 @@
   <div class="empty"><p class="empty-title">Перевір фільтри.</p>{% for field, list in errors.items %}<p>{{ list|join:" " }}</p>{% endfor %}</div>
 </section>
 {% else %}
-{% if not append %}<section id="results" class="results" aria-live="polite">
+{% if not append %}<section id="results" class="results" aria-live="polite"{% if oob %} hx-swap-oob="true"{% endif %}>
   {% if unsaved %}<p class="unsaved-note">Це попередній перегляд. Натисни «Зберегти фільтри», щоб радар і бот шукали саме так.</p>{% endif %}
 {% endif %}
   {% for vacancy in page.vacancies %}
     {% include "subscriptions/_vacancy.html" %}
   {% empty %}
     {% if not append %}
+      {% if view == "new" %}
+      <div class="empty">
+        <p class="empty-title">Нових збігів за добу немає.</p>
+        <p>Тут ті, що з'явилися за останні 24 години і ще не прийшли тобі в Telegram. Нові вакансії підтягуємо кожні 30 хвилин.</p>
+      </div>
+      {% else %}
       <div class="empty">
         <p class="empty-title">Поки нічого не знайдено.</p>
         <p>Прибери частину слів, зніми «Тільки віддалено» або додай категорію. Нові вакансії підтягуємо кожні 30 хвилин, тож список ще поповниться.</p>
       </div>
+      {% endif %}
     {% endif %}
   {% endfor %}
   {% if page.has_more and subscription and not preview %}
     <button type="button" class="btn btn-outline btn-block more"
-            hx-get="{% url 'subscriptions:results' subscription.token %}?offset={{ page.next_offset }}"
+            hx-get="{% url 'subscriptions:results' subscription.token %}?offset={{ page.next_offset }}{% if view == 'new' %}&amp;view=new{% endif %}"
             hx-target="this" hx-swap="outerHTML">Показати ще {{ remaining }}</button>
   {% elif page.has_more and not subscription %}
     <p class="results-more-note">Ще {{ remaining }} {{ remaining|uk_plural:"вакансія,вакансії,вакансій" }} за цими фільтрами. Створи радар, щоб бачити всі збіги і нові наживо.</p>
@@ -32,3 +39,4 @@
 {% if fragment and not append %}<span id="match-count" class="count-pill mono" hx-swap-oob="true">{{ page.total }}</span>{% endif %}
 {% if since_id is not None and subscription %}{% include "subscriptions/_live.html" with oob=True %}{% endif %}
 {% endif %}
+{% if save_status %}{% include "subscriptions/_save_status.html" with oob=True %}{% endif %}

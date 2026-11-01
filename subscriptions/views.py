@@ -12,8 +12,10 @@ Pages (the top navigation: Головна, Фільтри, Telegram-бот):
 /filters/ and /bot/ redirect to the radar remembered in the cookie, if any.
 
 HTMX fragments:
-- preview/                matches for unsaved filters (updates as the form changes)
-- s/<token>/results/      results list, first page or "Показати ще"
+- preview/                matches for unsaved filters on /filters/ (before a radar exists)
+- POST s/<token>/         (HTMX) auto-saves ONE changed filter, returns the new matches
+- s/<token>/filters-form/ re-reads the filters from the DB when the tab is visible again
+- s/<token>/results/      results list ("Усі" or "Нові"), first page or "Показати ще"
 - s/<token>/live/         polled every 60 s: "Нові · N" tab, last-fetch stamp, toast
 - s/<token>/link-status/  polled on the connect page until the chat is linked
 - s/<token>/next-slot/    "Наступне сповіщення о 18:00" for unsaved frequency choices
@@ -25,7 +27,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Max
-from django.http import HttpResponse
+from django.http import HttpResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -36,7 +38,7 @@ from radar.models import Source
 from radar.search import fresh_feed, latest_vacancy_id, newer_than, search
 
 from . import schedule
-from .forms import FiltersForm, NotificationsForm
+from .forms import FILTER_FIELDS, FiltersForm, NotificationsForm, category_choices
 from .models import Delivery, Subscription
 
 TOKEN_COOKIE = "jr_token"
@@ -46,6 +48,7 @@ PREVIEW_SIZE = 8
 FEED_SIZE = 6
 HERO_BLIPS = 9
 FRESH_HOURS = 24
+VIEW_ALL, VIEW_NEW = "all", "new"
 
 
 # --- helpers ------------------------------------------------------------------------
@@ -88,16 +91,45 @@ def last_fetched_at():
     return Source.objects.aggregate(m=Max("last_fetched_at"))["m"]
 
 
+def _fresh_after():
+    return timezone.now() - timedelta(hours=FRESH_HOURS)
+
+
+def _search(subscription, filters: Filters, *, view=VIEW_ALL, offset=0, limit=PAGE_SIZE):
+    """
+    "Усі" = every match; "Нові" = what the cards mark НОВА: first seen in the last
+    FRESH_HOURS and not sent to this radar's Telegram chat yet.
+    """
+    if view == VIEW_NEW and subscription is not None:
+        return search(
+            filters,
+            offset=offset,
+            limit=limit,
+            fresh_after=_fresh_after(),
+            skip_delivered_to=subscription,
+        )
+    return search(filters, offset=offset, limit=limit)
+
+
+def _view_param(request) -> str:
+    return VIEW_NEW if request.GET.get("view") == VIEW_NEW else VIEW_ALL
+
+
 def _results_context(subscription, filters: Filters, page, **extra) -> dict:
-    return {
+    context = {
         "subscription": subscription,
         "filters": filters,
         "page": page,
+        "view": VIEW_ALL,
         "remaining": max(page.total - page.next_offset, 0),
         "seen_ids": _delivered_ids(subscription, page.vacancies),
-        "fresh_after": timezone.now() - timedelta(hours=FRESH_HOURS),
+        "fresh_after": _fresh_after(),
         **extra,
     }
+    if subscription is not None and not context.get("append") and "new_count" not in context:
+        # The number on the "Нові" tab
+        context["new_count"] = _search(subscription, filters, view=VIEW_NEW, limit=0).total
+    return context
 
 
 # Hero radar animation. The beam turns once per SWEEP_SECONDS; at rotation 0 its
@@ -246,7 +278,9 @@ def detail(request, token: str):
     """Filters page of an existing radar: filters, live matches, fresh feed."""
     subscription = get_object_or_404(Subscription, token=token)
 
-    if request.method == "POST":
+    if request.method == "POST" and request.headers.get("HX-Request"):
+        return _autosave_filters(request, subscription)
+    if request.method == "POST":  # no JS: the whole form, submitted with Enter
         form = FiltersForm(request.POST)
         if form.is_valid():
             form.save(subscription)
@@ -257,9 +291,10 @@ def detail(request, token: str):
         form = FiltersForm.for_subscription(subscription)
 
     filters = Filters.from_subscription(subscription)
-    page = search(filters, limit=PAGE_SIZE)
+    page = _search(subscription, filters)
     context = {
         "form": form,
+        "version": _version(subscription),
         "since_id": latest_vacancy_id(),
         "last_fetched_at": last_fetched_at(),
         "feed": fresh_feed(limit=FEED_SIZE),
@@ -393,6 +428,92 @@ def notifications(request, token: str):
     return render(request, "subscriptions/_bot_settings.html", context)
 
 
+def _version(subscription: Subscription) -> str:
+    """Changes whenever the radar is saved, here or in the bot."""
+    return str(int(subscription.updated_at.timestamp() * 1000))
+
+
+def _current_filter_values(request, subscription: Subscription):
+    """
+    Form data for an auto-save: the ONE field the user just changed (`changed`,
+    sent by the page) from the request, everything else from the database. A tab
+    left open while you edited words in the bot then can't write its stale words
+    back when you tick a category. Reset (or an unknown field) sends the whole form.
+    """
+    changed = request.POST.get("changed", "")
+    if changed not in FILTER_FIELDS:
+        return request.POST
+    known = {value for value, _ in category_choices()}
+    data = QueryDict(mutable=True)
+    data["include_keywords"] = ", ".join(subscription.include_keywords)
+    data["exclude_keywords"] = ", ".join(subscription.exclude_keywords)
+    data.setlist("categories", [c for c in subscription.categories if c in known])
+    if subscription.remote_only:
+        data["remote_only"] = "on"
+    data.pop(changed, None)  # an unticked checkbox isn't sent at all
+    if changed == "categories":
+        data.setlist("categories", request.POST.getlist("categories"))
+    elif changed in request.POST:
+        data[changed] = request.POST[changed]
+    return data
+
+
+def _autosave_filters(request, subscription: Subscription):
+    form = FiltersForm(_current_filter_values(request, subscription))
+    if not form.is_valid():
+        context = {"errors": form.errors, "fragment": True, "save_status": "error"}
+        return render(request, "subscriptions/_results.html", context)
+    form.save(subscription)
+    _sync_bot(subscription)
+    return _render_results(request, subscription, view=VIEW_ALL, save_status="saved")
+
+
+def _render_results(request, subscription, *, view, offset=0, **extra):
+    filters = Filters.from_subscription(subscription)
+    page = _search(subscription, filters, view=view, offset=offset)
+    extra.update(view=view, append=offset > 0, fragment=True)
+    if offset == 0:
+        # Reloading the list resets the toast's "since" cursor, and the toast has
+        # done its job: the list now includes those vacancies.
+        extra.update(
+            since_id=latest_vacancy_id(),
+            shown=0,
+            clear_toast=True,
+            last_fetched_at=last_fetched_at(),
+        )
+    return render(
+        request,
+        "subscriptions/_results.html",
+        _results_context(subscription, filters, page, **extra),
+    )
+
+
+@require_GET
+def filters_form(request, token: str):
+    """
+    The filters card again, from the database, plus fresh matches. Requested when
+    the tab becomes visible (say, after editing words in the bot); 204 when
+    nothing was saved since the page was drawn.
+    """
+    subscription = get_object_or_404(Subscription, token=token)
+    version = _version(subscription)
+    if request.GET.get("v") == version:
+        return HttpResponse(status=204)
+    filters = Filters.from_subscription(subscription)
+    context = {
+        "form": FiltersForm.for_subscription(subscription),
+        "version": version,
+        "since_id": latest_vacancy_id(),
+        "shown": 0,
+        "clear_toast": True,
+        "last_fetched_at": last_fetched_at(),
+        "fragment": True,
+        "oob": True,
+        **_results_context(subscription, filters, _search(subscription, filters)),
+    }
+    return render(request, "subscriptions/_filters_box.html", context)
+
+
 def _sync_bot(subscription: Subscription) -> None:
     """Edit the settings message in Telegram to match what was saved here."""
     from bot.sync import refresh_settings_message  # bot depends on this app, not vice versa
@@ -455,24 +576,7 @@ def preview(request):
 def results(request, token: str):
     subscription = get_object_or_404(Subscription, token=token)
     offset = _int_param(request, "offset", default=0)
-    filters = Filters.from_subscription(subscription)
-    page = search(filters, offset=offset, limit=PAGE_SIZE)
-    extra = {"append": offset > 0, "fragment": True}
-    if offset == 0:
-        # Reloading the list resets the "Нові · N" counter to a fresh cursor, and
-        # the toast has done its job: the list now includes those vacancies.
-        extra.update(
-            since_id=latest_vacancy_id(),
-            new_count=0,
-            shown=0,
-            clear_toast=True,
-            last_fetched_at=last_fetched_at(),
-        )
-    return render(
-        request,
-        "subscriptions/_results.html",
-        _results_context(subscription, filters, page, **extra),
-    )
+    return _render_results(request, subscription, view=_view_param(request), offset=offset)
 
 
 @require_GET
@@ -480,14 +584,17 @@ def live(request, token: str):
     subscription = get_object_or_404(Subscription, token=token)
     since_id = _int_param(request, "since", default=latest_vacancy_id())
     shown = _int_param(request, "shown", default=0)
-    new = newer_than(Filters.from_subscription(subscription), since_id)
+    new = newer_than(Filters.from_subscription(subscription), since_id)  # since page load
     # Pop the toast only when a fetch brought MORE new matches than already
     # announced; the same count must not pop up again every minute.
     show_toast = settings.NEW_VACANCIES_TOAST and len(new) > shown
+    filters = Filters.from_subscription(subscription)
     context = {
         "subscription": subscription,
+        "view": _view_param(request),
         "since_id": since_id,
-        "new_count": len(new),
+        "arrived": len(new),
+        "new_count": _search(subscription, filters, view=VIEW_NEW, limit=0).total,
         "shown": max(shown, len(new)),
         "newest": new[0] if new else None,
         "last_fetched_at": last_fetched_at(),

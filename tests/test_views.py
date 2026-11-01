@@ -332,7 +332,7 @@ def test_results_reload_resets_live_state_out_of_band(client, subscription, make
     html = html_of(client.get(url("results", subscription)))
 
     assert f"?since={v.pk}" in html
-    assert 'id="new-tab"' in html and "Нові ·" not in html
+    assert 'id="new-tab"' in html and "Нові · 1" in html  # fresh and not sent to Telegram
     assert 'id="match-count" class="count-pill mono" hx-swap-oob="true">1<' in html
 
 
@@ -360,8 +360,8 @@ def test_preview_reports_errors(client):
     assert "Перевір фільтри" in html
 
 
-def test_live_counts_new_matches_since_cursor(client, subscription, make_vacancy):
-    old = make_vacancy(title="Python old")
+def test_live_counts_fresh_matches_and_keeps_the_cursor(client, subscription, make_vacancy):
+    old = make_vacancy(title="Python old", first_seen_at=timezone.now() - timedelta(days=2))
     live_url = url("live", subscription, f"?since={old.pk}")
 
     assert "Нові ·" not in html_of(client.get(live_url))
@@ -405,7 +405,7 @@ def test_toast_does_not_repeat_for_the_same_count(client, subscription, make_vac
     html = html_of(client.get(url("live", subscription, f"?since={old.pk}&shown=1")))
 
     assert "data-toast" not in html
-    assert "Нові · 1" in html  # the tab still shows it
+    assert "Нові · 2" in html  # the tab still counts them (both are fresh)
 
 
 def test_toast_comes_back_when_more_arrive(client, subscription, make_vacancy):
@@ -631,3 +631,98 @@ def test_places_and_where():
     )
     assert where(SimpleNamespace(location="віддалено", is_remote=True)) == "Віддалено"
     assert where(SimpleNamespace(location="Київ", is_remote=False)) == "Київ"
+
+
+# --- "Нові" view ---------------------------------------------------------------------
+
+
+def test_new_view_lists_fresh_matches_not_sent_to_telegram(client, linked, make_vacancy):
+    make_vacancy(title="Python old", first_seen_at=timezone.now() - timedelta(days=2))
+    sent = make_vacancy(title="Python sent")
+    make_vacancy(title="Python fresh")
+    Delivery.objects.create(subscription=linked, vacancy=sent)
+
+    html = html_of(client.get(url("results", linked, "?view=new")))
+
+    results = html.split('id="results"', 1)[1].split("</section>", 1)[0]
+    assert "Python fresh" in results
+    assert "Python sent" not in results and "Python old" not in results
+    assert 'aria-pressed="true"' in html.split("Нові")[0].rsplit("<button", 1)[1]
+    assert "view=new" in html  # the poller keeps the view
+
+
+def test_new_view_empty_state(client, subscription):
+    html = html_of(client.get(url("results", subscription, "?view=new")))
+    assert "Нових збігів за добу немає" in html
+
+
+def test_detail_page_shows_new_count_on_load(client, subscription, make_vacancy):
+    make_vacancy(title="Python fresh")
+    assert "Нові · 1" in html_of(client.get(url("detail", subscription)))
+
+
+# --- auto-save and sync with the bot ---------------------------------------------------
+
+
+def autosave(client, sub, data):
+    return client.post(url("detail", sub), data, HTTP_HX_REQUEST="true")
+
+
+def test_autosave_saves_only_the_changed_field(client, subscription, make_vacancy):
+    """The page is stale: the bot replaced the words. Ticking remote must keep them."""
+    Subscription.objects.filter(pk=subscription.pk).update(include_keywords=["django"])
+    make_vacancy(title="Django dev", is_remote=True)
+
+    response = autosave(
+        client,
+        subscription,
+        {"changed": "remote_only", "remote_only": "on", "include_keywords": "python"},
+    )
+
+    subscription.refresh_from_db()
+    assert subscription.remote_only is True
+    assert subscription.include_keywords == ["django"]
+    html = html_of(response)
+    assert "Django dev" in html and "Збережено" in html
+
+
+def test_autosave_unticking_the_last_category_clears_them(client, subscription):
+    autosave(client, subscription, {"changed": "categories"})
+    subscription.refresh_from_db()
+    assert subscription.categories == []
+
+
+def test_autosave_reset_saves_the_whole_form(client, subscription):
+    autosave(client, subscription, {"changed": "", "include_keywords": "", "exclude_keywords": ""})
+    subscription.refresh_from_db()
+    assert subscription.include_keywords == [] and subscription.categories == []
+
+
+def test_autosave_rejects_invalid_input(client, subscription):
+    response = autosave(
+        client, subscription, {"changed": "exclude_keywords", "exclude_keywords": "a" * 41}
+    )
+    assert "Не збережено" in html_of(response)
+    subscription.refresh_from_db()
+    assert subscription.exclude_keywords == []
+
+
+def test_autosave_updates_the_bot_panel(client, subscription, monkeypatch):
+    calls = []
+    monkeypatch.setattr("bot.sync.refresh_settings_message", calls.append)
+    autosave(client, subscription, {"changed": "include_keywords", "include_keywords": "django"})
+    assert calls and calls[0].include_keywords == ["django"]
+
+
+def test_filters_card_rereads_the_database_when_changed_in_the_bot(client, subscription):
+    page = html_of(client.get(url("detail", subscription)))
+    version = page.split("filters-form/?v=", 1)[1].split('"', 1)[0]
+    refresh = reverse("subscriptions:filters_form", args=[subscription.token]) + f"?v={version}"
+
+    assert client.get(refresh).status_code == 204  # nothing changed: no swap
+
+    subscription.include_keywords = ["django"]
+    subscription.save(update_fields=["include_keywords", "updated_at"])
+    html = html_of(client.get(refresh))
+    assert 'value="django"' in html
+    assert 'id="results" class="results" aria-live="polite" hx-swap-oob="true"' in html

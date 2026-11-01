@@ -34,9 +34,26 @@ def base_queryset(filters: Filters):
     return qs
 
 
-def search(filters: Filters, *, offset: int = 0, limit: int = 20) -> Page:
-    """Newest matching vacancies, paginated by offset over the matched list."""
-    qs = base_queryset(filters).newest_first()
+def search(
+    filters: Filters,
+    *,
+    offset: int = 0,
+    limit: int = 20,
+    fresh_after=None,
+    skip_delivered_to=None,
+) -> Page:
+    """
+    Newest matching vacancies, paginated by offset over the matched list.
+
+    `fresh_after` + `skip_delivered_to` give the "Нові" view: first seen after
+    that moment and not yet sent to that subscription's Telegram chat.
+    """
+    qs = base_queryset(filters)
+    if fresh_after is not None:
+        qs = qs.filter(first_seen_at__gt=fresh_after)
+    if skip_delivered_to is not None:
+        qs = qs.exclude(deliveries__subscription=skip_delivered_to)
+    qs = qs.newest_first()
     matched = [v for v in qs.iterator(chunk_size=CHUNK_SIZE) if vacancy_matches(filters, v)]
     page = matched[offset : offset + limit]
     return Page(

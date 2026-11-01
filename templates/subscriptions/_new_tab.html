@@ -1,6 +1,14 @@
-<div id="new-tab" class="segmented" role="group" aria-label="Відбір збігів"{% if oob %} hx-swap-oob="true"{% endif %}>
-  <span class="segmented-item is-active">Усі</span>
-  <button type="button" class="segmented-item{% if new_count %} has-new{% endif %}"
+{% comment %}
+  "Усі | Нові · N" switch above the matches. "Нові" lists what the cards mark НОВА:
+  first seen in the last 24 h and not sent to Telegram yet; N is their number,
+  refreshed by the live poll. Params: subscription, view, new_count, oob.
+{% endcomment %}<div id="new-tab" class="segmented" role="group" aria-label="Відбір збігів"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <button type="button" class="segmented-item{% if view != 'new' %} is-active{% endif %}"
+          aria-pressed="{% if view != 'new' %}true{% else %}false{% endif %}"
           hx-get="{% url 'subscriptions:results' subscription.token %}"
-          hx-target="#results" hx-swap="outerHTML">Нові{% if new_count %} · {{ new_count }}{% endif %}{% if new_count %}<span class="sr-only"> нових вакансій, показати</span>{% endif %}</button>
+          hx-target="#results" hx-swap="outerHTML">Усі</button>
+  <button type="button" class="segmented-item{% if view == 'new' %} is-active{% elif new_count %} has-new{% endif %}"
+          aria-pressed="{% if view == 'new' %}true{% else %}false{% endif %}"
+          hx-get="{% url 'subscriptions:results' subscription.token %}?view=new"
+          hx-target="#results" hx-swap="outerHTML">Нові{% if new_count %} · {{ new_count }}{% endif %}</button>
 </div>

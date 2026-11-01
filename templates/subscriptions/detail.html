@@ -8,11 +8,11 @@
     <div class="section-head">
       <p class="eyebrow">Мій радар</p>
       <h1 id="filters-title" class="h2">Що шукає твій радар</h1>
-      <p class="lead">Змінюй фільтри, і збіги оновляться одразу, ще до збереження. Ті самі фільтри використовує бот у Telegram.</p>
+      <p class="lead">Зміни зберігаються одразу, і бот у Telegram шукає за тими самими фільтрами.</p>
     </div>
     <div class="workspace">
       <div class="stack">
-        {% include "subscriptions/_filters_form.html" with submit_label="Зберегти фільтри" submit_hint="Радар і бот шукатимуть саме так" %}
+        {% include "subscriptions/_filters_box.html" %}
         {% if not subscription.is_linked %}
           <p class="page-hint">{% include "components/icons.html" with name="telegram" %}<span>Хочеш отримувати нові збіги в Telegram? <a href="{% url 'subscriptions:radar_bot' subscription.token %}">Підключи бота</a>, це один клік.</span></p>
         {% endif %}

@@ -49,6 +49,10 @@
 
     let words = splitKeywords(source.value);
     let pendingTimer;
+    // On a radar every change is saved at once, so a half-typed word must not be:
+    // it is saved on Enter, comma or when the field loses focus. On /filters/ the
+    // change only previews matches, so a pause in typing is enough.
+    const autosave = Boolean(root.closest("form[data-autosave]"));
 
     // The hidden value always includes text still being typed, so the preview and
     // a submit see it, but it only becomes a chip on Enter or comma. (Turning it
@@ -107,8 +111,14 @@
     // The entry has no name, so its own change event must not trigger a preview.
     entry.addEventListener("change", (event) => event.stopPropagation());
     entry.addEventListener("input", () => {
+      if (autosave) return sync();
       clearTimeout(pendingTimer);
       pendingTimer = setTimeout(commit, 500);
+    });
+    entry.addEventListener("blur", () => {
+      // Saved as typed; it becomes a chip on the next render. Making the chip now
+      // would shift the layout under the click that caused the blur.
+      if (autosave && entry.value.trim()) commit();
     });
     entry.addEventListener("paste", () => setTimeout(() => /[,;\n]/.test(entry.value) && addFromEntry()));
 

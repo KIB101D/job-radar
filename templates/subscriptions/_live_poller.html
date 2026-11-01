@@ -3,6 +3,6 @@
   many new matches the toast has already announced, so it only pops up again when
   a later fetch brings more.
 {% endcomment %}<div id="live-poll"{% if oob %} hx-swap-oob="true"{% endif %} hidden
-     hx-get="{% url 'subscriptions:live' subscription.token %}?since={{ since_id }}&amp;shown={{ shown|default:0 }}"
+     hx-get="{% url 'subscriptions:live' subscription.token %}?since={{ since_id }}&amp;shown={{ shown|default:0 }}{% if view == 'new' %}&amp;view=new{% endif %}"
      hx-trigger="every 60s[document.visibilityState === 'visible']"
      hx-swap="none"></div>

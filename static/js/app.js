@@ -164,6 +164,26 @@
     value.classList.toggle("is-set", Boolean(text));
   }
 
+  // --- Filters column that follows the page ------------------------------------------------
+  // Sticky by its top while it fits the window; when taller (a group unfolded), it
+  // scrolls with the page and then sticks by its bottom, so no inner scrollbar.
+
+  const GAP = 20;
+
+  function fitSticky(side) {
+    const top = Math.min(GAP, window.innerHeight - side.offsetHeight - GAP);
+    side.style.top = `${top}px`;
+  }
+
+  function watchSticky() {
+    const side = document.querySelector(".workspace-side");
+    if (!side) return;
+    const fit = () => fitSticky(side);
+    if ("ResizeObserver" in window) new ResizeObserver(fit).observe(side);
+    window.addEventListener("resize", fit);
+    fit();
+  }
+
   // --- Copy to clipboard ------------------------------------------------------------------
 
   async function copy(button) {
@@ -207,6 +227,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     enhance(document);
+    watchSticky();
     // Content swapped in by HTMX gets the same treatment.
     document.body.addEventListener("htmx:load", (event) => enhance(event.target));
   });

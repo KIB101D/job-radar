@@ -271,7 +271,7 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 /* Two columns on wide screens: matches on the left, filters on the right. Both
    start with a bare header of the same height, so the first card and the filters
    panel line up. The filters come first in the markup (on a phone they're on top)
-   and stick next to the list while it scrolls. */
+   and stay next to the list while the page scrolls. */
 .workspace { display: flex; flex-direction: column; gap: 32px; }
 .workspace-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .matches { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -281,11 +281,9 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
     align-items: start; gap: 32px;
   }
   .matches { grid-area: main; }
-  .workspace-side {
-    grid-area: side; position: sticky; top: 20px;
-    max-height: calc(100vh - 40px); overflow-y: auto; overscroll-behavior: contain;
-    scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
-  }
+  /* No scrollbar of its own: the page scrolls. A panel taller than the window
+     sticks by its bottom instead of its top (static/js/app.js sets `top`). */
+  .workspace-side { grid-area: side; position: sticky; top: 20px; }
 }
 
 .col-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }

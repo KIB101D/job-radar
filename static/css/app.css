@@ -129,8 +129,12 @@ a:hover { color: var(--lime-hover); }
 .logo svg { color: var(--lime); }
 .logo:hover { color: var(--text); }
 .site-nav { display: flex; gap: 28px; flex-wrap: wrap; }
-.site-nav a { color: var(--muted); text-decoration: none; font-size: 15px; padding-block: 10px; }
+.site-nav a {
+  color: var(--muted); text-decoration: none; font-size: 15px;
+  padding-block: 10px; border-bottom: 2px solid transparent;
+}
 .site-nav a:hover { color: var(--text); }
+.site-nav a[aria-current="page"] { color: var(--text); border-bottom-color: var(--lime); }
 @media (max-width: 560px) { .site-nav { gap: 18px; } }
 
 .site-footer { border-top: 1px solid var(--line); }
@@ -152,6 +156,8 @@ a:hover { color: var(--lime-hover); }
 .section { border-bottom: 1px solid var(--line); padding-block: 80px; }
 .section-first { padding-top: 48px; }
 .section-alt { background: var(--bg-alt); }
+/* A page made of one section: no divider before the footer. */
+.section-page { border-bottom: 0; }
 .section-head { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 720px) { .section { padding-block: 56px; } .section-first { padding-top: 32px; } }
 
@@ -228,6 +234,9 @@ a:hover { color: var(--lime-hover); }
   background: var(--panel); border: 1px solid var(--border);
 }
 .how-card p { margin: 0; color: var(--muted); font-size: 15px; }
+a.how-card { color: var(--text); text-decoration: none; }
+a.how-card:hover { border-color: var(--border-btn); color: var(--text); }
+a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 .how-num { font-size: 13px; color: var(--faint); }
 .how-card-accent { background: var(--lime-bg); border-color: var(--lime-border); }
 .how-card-accent p { color: var(--lime-text); }
@@ -527,6 +536,15 @@ button.segmented-item:hover { color: var(--text); }
 .quiet-text .setting-title { font-size: 15px; }
 
 .notfound { padding-block: 24px; }
+
+.page-hint {
+  display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px;
+  border-radius: var(--radius-md); background: var(--blue-bg); border: 1px solid var(--blue-border);
+  font-size: 14px; color: var(--text-soft);
+}
+.page-hint .icon { color: var(--blue); flex-shrink: 0; margin-top: 2px; }
+.page-hint a { color: var(--text); font-weight: 600; }
+.page-hint a:hover { color: var(--lime); }
 
 /* ---- Toast (components/toast.html; off by default) ------------------------------ */
 

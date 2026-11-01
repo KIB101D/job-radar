@@ -1,12 +1,9 @@
 {% extends "base.html" %}
-{% load radar_ui %}
 
 {% block title %}Мій радар | Job Radar{% endblock %}
-{% block nav_filters %}#filters{% endblock %}
-{% block nav_bot %}#bot{% endblock %}
 
 {% block content %}
-<section id="filters" class="section section-first" aria-labelledby="filters-title">
+<section class="section section-first section-page" aria-labelledby="filters-title">
   <div class="wrap stack-lg">
     <div class="section-head">
       <p class="eyebrow">Мій радар</p>
@@ -16,29 +13,13 @@
     <div class="workspace">
       <div class="stack">
         {% include "subscriptions/_filters_form.html" with submit_label="Зберегти фільтри" submit_hint="Радар і бот шукатимуть саме так" %}
+        {% if not subscription.is_linked %}
+          <p class="page-hint">{% include "components/icons.html" with name="telegram" %}<span>Хочеш отримувати нові збіги в Telegram? <a href="{% url 'subscriptions:radar_bot' subscription.token %}">Підключи бота</a>, це один клік.</span></p>
+        {% endif %}
         <p class="field-help bookmark">Збережи адресу цієї сторінки: за нею ти повернешся до своїх фільтрів з будь-якого пристрою. Не ділися нею з іншими.</p>
       </div>
-      <section id="matches" class="matches" aria-labelledby="matches-title">
-        <div class="matches-head">
-          <div class="matches-title-row">
-            <h2 id="matches-title" class="h3">Збіги</h2>
-            <span id="match-count" class="count-pill mono">{{ page.total }}</span>
-            <span class="live"><span class="dot dot-lime pulse" aria-hidden="true"></span><span class="live-label">Live</span>{% include "subscriptions/_live_stamp.html" %}</span>
-          </div>
-          {% include "subscriptions/_new_tab.html" with new_count=0 %}
-        </div>
-        {% include "subscriptions/_results.html" with since_id=None %}
-        {% include "subscriptions/_live_poller.html" %}
-        {% include "subscriptions/_feed.html" %}
-      </section>
+      {% include "subscriptions/_matches.html" %}
     </div>
-  </div>
-</section>
-
-<section id="bot" class="section section-alt" aria-labelledby="bot-title">
-  <div class="wrap bot-grid">
-    {% include "subscriptions/_bot_intro.html" %}
-    <div>{% include "subscriptions/_bot_settings.html" %}</div>
   </div>
 </section>
 {% endblock %}

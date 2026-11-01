@@ -1,0 +1,16 @@
+{% comment %}Matches column: header with count, Live stamp and (for a radar) the "Нові · N" tab.{% endcomment %}
+<section id="matches" class="matches" aria-labelledby="matches-title">
+  <div class="matches-head">
+    <div class="matches-title-row">
+      <h2 id="matches-title" class="h3">Збіги</h2>
+      <span id="match-count" class="count-pill mono">{{ page.total }}</span>
+      <span class="live"><span class="dot dot-lime pulse" aria-hidden="true"></span><span class="live-label">Live</span>{% include "subscriptions/_live_stamp.html" %}</span>
+    </div>
+    {% if subscription %}{% include "subscriptions/_new_tab.html" with new_count=0 %}{% endif %}
+  </div>
+  {% include "subscriptions/_results.html" with since_id=None %}
+  {% if subscription %}
+    {% include "subscriptions/_live_poller.html" %}
+    {% include "subscriptions/_feed.html" %}
+  {% endif %}
+</section>

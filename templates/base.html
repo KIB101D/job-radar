@@ -23,9 +23,9 @@
     <div class="wrap site-header-inner">
       {% include "components/logo.html" %}
       <nav class="site-nav" aria-label="Основна навігація">
-        <a href="{% url 'subscriptions:home' %}">Головна</a>
-        <a href="{% block nav_filters %}{% url 'subscriptions:home' %}#filters{% endblock %}">Фільтри</a>
-        <a href="{% block nav_bot %}{% url 'subscriptions:home' %}#bot{% endblock %}">Telegram-бот</a>
+        <a href="{% url 'subscriptions:home' %}"{% if nav_active == "home" %} aria-current="page"{% endif %}>Головна</a>
+        <a href="{{ nav_filters_url|default:'/filters/' }}"{% if nav_active == "filters" %} aria-current="page"{% endif %}>Фільтри</a>
+        <a href="{{ nav_bot_url|default:'/bot/' }}"{% if nav_active == "bot" %} aria-current="page"{% endif %}>Telegram-бот</a>
       </nav>
     </div>
   </header>

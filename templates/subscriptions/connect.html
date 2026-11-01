@@ -49,7 +49,7 @@
 {% block footer %}
 <footer class="site-footer">
   <div class="wrap wrap-narrow site-footer-inner">
-    <a class="back-link" href="{% url 'subscriptions:detail' subscription.token %}">{% include "components/icons.html" with name="back" %}Назад до фільтрів</a>
+    <a class="back-link" href="{% url 'subscriptions:radar_bot' subscription.token %}">{% include "components/icons.html" with name="back" %}Назад</a>
     <a class="quiet-link" href="{% url 'subscriptions:detail' subscription.token %}">Пізніше, лише сайт</a>
   </div>
 </footer>

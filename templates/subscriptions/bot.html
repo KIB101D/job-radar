@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Telegram-бот | Job Radar{% endblock %}
+
+{% block content %}
+<section class="section section-first section-page" aria-labelledby="bot-title">
+  <div class="wrap bot-grid">
+    {% include "subscriptions/_bot_intro.html" %}
+    <div>
+      {% if subscription %}
+        {% include "subscriptions/_bot_settings.html" %}
+      {% else %}
+        <div class="panel bot-card">
+          <div class="bot-card-head">
+            <div class="bot-avatar">{% include "components/icons.html" with name="telegram" %}</div>
+            <div class="bot-card-who">
+              <div class="bot-card-title">Як підключити</div>
+              <div class="field-help">Спершу фільтри, далі один клік</div>
+            </div>
+          </div>
+          <ol class="steps">
+            <li><span class="step-num mono">01</span><span>Налаштуй фільтри і створи радар</span></li>
+            <li><span class="step-num mono">02</span><span>Натисни «Підключити бота» і Start у Telegram. Бот одразу надішле першу пачку збігів</span></li>
+            <li><span class="step-num mono step-num-lime">03</span><span>Обери частоту: щогодини, кожні 3, 6, 12 год або раз на день о 09:00</span></li>
+          </ol>
+          <a class="btn btn-primary" href="{% url 'subscriptions:filters' %}">Налаштувати фільтри</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

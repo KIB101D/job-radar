@@ -1,11 +1,15 @@
 """
 Website. Pages only read from our DB; scraping happens in background jobs.
 
-Pages:
-- /                       landing: hero, filter form (creates a radar), live preview, bot promo
-- /s/<token>/             the radar: filters, matches, Telegram settings
+Pages (the top navigation: Головна, Фільтри, Telegram-бот):
+- /                       Головна: hero with a radar of the newest vacancies, how it works
+- /filters/               Фільтри without a radar: form + live preview; saving creates one
+- /s/<token>/             Фільтри of a radar: filters, live matches, fresh feed
+- /bot/                   Telegram-бот without a radar: what the bot does, how to start
+- /s/<token>/bot/         Telegram-бот of a radar: connect, or frequency and quiet hours
 - /s/<token>/connect/     step 2: open the bot (deep link, QR)
 - /s/<token>/frequency/   step 3: how often to notify
+/filters/ and /bot/ redirect to the radar remembered in the cookie, if any.
 
 HTMX fragments:
 - preview/                matches for unsaved filters (updates as the form changes)
@@ -152,8 +156,27 @@ def _int_param(request, name: str, *, default: int) -> int:
 # --- pages --------------------------------------------------------------------------
 
 
-@require_http_methods(["GET", "POST"])
+def _cookie_radar(request) -> Subscription | None:
+    token = request.COOKIES.get(TOKEN_COOKIE)
+    return Subscription.objects.filter(token=token).first() if token else None
+
+
+@require_GET
 def home(request):
+    context = {
+        "existing": _cookie_radar(request),
+        "blips": radar_blips(fresh_feed(limit=HERO_BLIPS)),
+    }
+    return render(request, "subscriptions/home.html", context)
+
+
+@require_http_methods(["GET", "POST"])
+def filters_new(request):
+    """Filters page for someone without a radar yet; saving creates one."""
+    if request.method == "GET" and "new" not in request.GET:
+        if existing := _cookie_radar(request):
+            return redirect("subscriptions:detail", existing.token)
+
     if request.method == "POST":
         form = FiltersForm(request.POST)
         if form.is_valid():
@@ -163,24 +186,19 @@ def home(request):
     else:
         form = FiltersForm()
 
-    existing = None
-    if token := request.COOKIES.get(TOKEN_COOKIE):
-        existing = Subscription.objects.filter(token=token).first()
-
     filters = Filters()
     page = search(filters, limit=PREVIEW_SIZE)
     context = {
         "form": form,
-        "existing": existing,
-        "blips": radar_blips(fresh_feed(limit=HERO_BLIPS)),
         "last_fetched_at": last_fetched_at(),
         **_results_context(None, filters, page, preview=True),
     }
-    return render(request, "subscriptions/home.html", context)
+    return render(request, "subscriptions/filters.html", context)
 
 
 @require_http_methods(["GET", "POST"])
 def detail(request, token: str):
+    """Filters page of an existing radar: filters, live matches, fresh feed."""
     subscription = get_object_or_404(Subscription, token=token)
 
     if request.method == "POST":
@@ -196,14 +214,32 @@ def detail(request, token: str):
     page = search(filters, limit=PAGE_SIZE)
     context = {
         "form": form,
-        "notifications_form": NotificationsForm(instance=subscription),
         "since_id": latest_vacancy_id(),
         "last_fetched_at": last_fetched_at(),
         "feed": fresh_feed(limit=FEED_SIZE),
-        **_bot_context(subscription),
         **_results_context(subscription, filters, page),
     }
     return _remember_token(render(request, "subscriptions/detail.html", context), token)
+
+
+@require_GET
+def bot(request):
+    """Telegram page for someone without a radar: what the bot does, how to start."""
+    if existing := _cookie_radar(request):
+        return redirect("subscriptions:radar_bot", existing.token)
+    return render(request, "subscriptions/bot.html", {"bot_username": _bot_username()})
+
+
+@require_GET
+def radar_bot(request, token: str):
+    """Telegram page of a radar: connect, or frequency and quiet hours."""
+    subscription = get_object_or_404(Subscription, token=token)
+    context = {
+        "subscription": subscription,
+        "notifications_form": NotificationsForm(instance=subscription),
+        **_bot_context(subscription),
+    }
+    return _remember_token(render(request, "subscriptions/bot.html", context), token)
 
 
 def _bot_context(subscription: Subscription) -> dict:
@@ -220,7 +256,7 @@ def connect(request, token: str):
     subscription = get_object_or_404(Subscription, token=token)
     if subscription.is_linked:
         messages.info(request, "Telegram уже підключено.")
-        return redirect(reverse("subscriptions:detail", args=[token]) + "#bot")
+        return redirect("subscriptions:radar_bot", token)
     deep_link = _deep_link(subscription)
     qr_svg = ""
     if deep_link:
@@ -242,13 +278,13 @@ def frequency(request, token: str):
             subscription.frequency = "off"
             subscription.save(update_fields=["frequency", "updated_at"])
             messages.success(request, "Автосповіщення вимкнено. Перевіряй вручну, коли зручно.")
-            return redirect(reverse("subscriptions:detail", args=[token]) + "#bot")
+            return redirect("subscriptions:detail", token)
         if form.is_valid():
             form.save()
             label = schedule.next_slot_label(subscription)
             text = f"Збережено. Наступне сповіщення {label}." if label else "Збережено."
             messages.success(request, text)
-            return redirect(reverse("subscriptions:detail", args=[token]) + "#bot")
+            return redirect("subscriptions:detail", token)
     else:
         form = NotificationsForm(instance=subscription)
     context = {
@@ -265,7 +301,7 @@ def frequency(request, token: str):
 
 @require_POST
 def notifications(request, token: str):
-    """Auto-saved bot settings card on the radar page (HTMX)."""
+    """Auto-saved bot settings card on the radar's Telegram page (HTMX)."""
     subscription = get_object_or_404(Subscription, token=token)
     form = NotificationsForm(request.POST, instance=subscription)
     saved = form.is_valid()
@@ -288,7 +324,7 @@ def unlink(request, token: str):
     subscription.linked_at = None
     subscription.save(update_fields=["chat_id", "linked_at", "updated_at"])
     messages.success(request, "Telegram відключено. Фільтри на сайті лишились як були.")
-    return redirect(reverse("subscriptions:detail", args=[token]) + "#bot")
+    return redirect("subscriptions:radar_bot", token)
 
 
 # --- HTMX fragments -------------------------------------------------------------------

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Фільтри | Job Radar{% endblock %}
+
+{% block content %}
+<section class="section section-first section-page" aria-labelledby="filters-title">
+  <div class="wrap stack-lg">
+    <div class="section-head">
+      <p class="eyebrow">Фільтри</p>
+      <h1 id="filters-title" class="h2">Що шукає твій радар</h1>
+      <p class="lead">Змінюй фільтри, і збіги оновляться одразу. Збережи їх, щоб радар запам'ятав пошук, а Telegram-бот надсилав саме такі вакансії.</p>
+    </div>
+    <div class="workspace">
+      {% include "subscriptions/_filters_form.html" with submit_label="Створити радар" submit_hint="Після цього можна підключити Telegram-бота" %}
+      {% include "subscriptions/_matches.html" %}
+    </div>
+  </div>
+</section>
+{% endblock %}

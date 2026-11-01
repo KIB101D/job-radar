@@ -41,39 +41,82 @@ def results_block(html: str) -> str:
     return html.split('id="results"', 1)[1].split('id="feed"', 1)[0]
 
 
-# --- landing -------------------------------------------------------------------------
+# --- pages & navigation ------------------------------------------------------------------
 
 
-def test_home_has_hero_filters_preview_and_bot_section(client, make_vacancy):
-    make_vacancy(title="Fresh Python Role")
-
+def test_home_is_just_the_landing(client):
     html = html_of(client.get("/"))
 
     assert "Персональний радар вакансій" in html
-    assert "Створити радар" in html
-    assert "Fresh Python Role" in html  # live preview of matches
-    assert 'id="bot"' in html and "Як підключити" in html
+    assert url("filters") in html and url("bot") in html
+    assert "<form" not in html  # filters live on their own page
+    assert "Радар, який сам приходить" not in html  # and so does the bot
 
 
-def test_home_hides_features_that_do_not_exist_yet(client):
-    html = html_of(client.get("/"))
-    for stub in ("Досвід", "Зарплата від", "Збережені", "Бот підключено", "Зберегти вакансію"):
-        assert stub not in html
+def test_filters_page_has_form_and_live_preview(client, make_vacancy):
+    make_vacancy(title="Fresh Python Role")
+
+    html = html_of(client.get(url("filters")))
+
+    assert "Що шукає твій радар" in html and "Створити радар" in html
+    assert "Fresh Python Role" in html
 
 
-def test_home_preview_is_limited_and_invites_to_create(client, make_vacancy):
+def test_bot_page_without_radar_explains_and_sends_to_filters(client):
+    html = html_of(client.get(url("bot")))
+
+    assert "Радар, який сам приходить до тебе" in html
+    assert "Як підключити" in html and url("filters") in html
+    assert "<form" not in html
+
+
+@pytest.mark.parametrize(
+    ("path", "active"),
+    [("/", "Головна"), ("/filters/", "Фільтри"), ("/bot/", "Telegram-бот")],
+)
+def test_nav_marks_current_page(client, path, active):
+    html = html_of(client.get(path))
+    nav = html.split('class="site-nav"', 1)[1].split("</nav>", 1)[0]
+    assert nav.count('aria-current="page"') == 1
+    assert f'aria-current="page">{active}<' in nav
+
+
+def test_nav_inside_a_radar_stays_in_that_radar(client, subscription):
+    html = html_of(client.get(url("radar_bot", subscription)))
+    nav = html.split('class="site-nav"', 1)[1].split("</nav>", 1)[0]
+
+    assert f'href="{url("detail", subscription)}"' in nav
+    assert f'href="{url("radar_bot", subscription)}" aria-current="page"' in nav
+
+
+def test_filters_and_bot_redirect_to_remembered_radar(client, subscription):
+    client.cookies[TOKEN_COOKIE] = subscription.token
+
+    assert client.get(url("filters"))["Location"] == url("detail", subscription)
+    assert client.get(url("bot"))["Location"] == url("radar_bot", subscription)
+    assert client.get(url("filters", query="?new=1")).status_code == 200  # start another one
+
+
+def test_pages_hide_features_that_do_not_exist_yet(client):
+    for path in ("/", "/filters/", "/bot/"):
+        html = html_of(client.get(path))
+        for stub in ("Досвід", "Зарплата від", "Збережені", "Бот підключено", "Зберегти вакансію"):
+            assert stub not in html, (path, stub)
+
+
+def test_filters_preview_is_limited_and_invites_to_create(client, make_vacancy):
     for i in range(12):
         make_vacancy(title=f"Role {i}")
 
-    html = html_of(client.get("/"))
+    html = html_of(client.get(url("filters")))
 
-    assert results_block(html + 'id="feed"').count("<article") == 8
+    assert html.count("<article") == 8
     assert "Ще 4 вакансії за цими фільтрами" in html
 
 
 def test_create_subscription_sets_cookie_timezone_and_redirects(client):
     response = client.post(
-        "/",
+        url("filters"),
         {
             "include_keywords": "Python, Django;  django",
             "exclude_keywords": "senior",
@@ -96,7 +139,7 @@ def test_create_subscription_sets_cookie_timezone_and_redirects(client):
 
 
 def test_unknown_timezone_from_browser_is_ignored(client):
-    client.post("/", {"timezone": "Mars/Olympus"})
+    client.post(url("filters"), {"timezone": "Mars/Olympus"})
     assert Subscription.objects.get().timezone == "Europe/Kyiv"
 
 
@@ -110,7 +153,7 @@ def test_unknown_timezone_from_browser_is_ignored(client):
     ],
 )
 def test_invalid_input_is_rejected(client, data, error):
-    response = client.post("/", data)
+    response = client.post(url("filters"), data)
 
     assert response.status_code == 200
     assert error in html_of(response)
@@ -121,6 +164,7 @@ def test_home_links_to_existing_radar(client, subscription):
     client.cookies[TOKEN_COOKIE] = subscription.token
     html = html_of(client.get("/"))
     assert "Відкрити мій радар" in html and url("detail", subscription) in html
+    assert url("radar_bot", subscription) in html
 
 
 # --- radar page ------------------------------------------------------------------------
@@ -198,17 +242,30 @@ def test_update_with_errors_keeps_old_filters(client, subscription):
     assert subscription.include_keywords == ["python"]
 
 
-def test_unlinked_radar_offers_to_connect_bot(client, subscription):
-    html = html_of(client.get(url("detail", subscription)))
+def test_radar_filters_page_hints_at_bot_until_linked(client, subscription):
+    hint = url("radar_bot", subscription)
+    assert f'href="{hint}">Підключи бота' in html_of(client.get(url("detail", subscription)))
+
+    subscription.chat_id = 1
+    subscription.save()
+    assert f'href="{hint}">Підключи бота' not in html_of(client.get(url("detail", subscription)))
+
+
+def test_radar_bot_page_offers_to_connect(client, subscription):
+    html = html_of(client.get(url("radar_bot", subscription)))
     assert url("connect", subscription) in html
     assert "Бот підключено" not in html
 
 
-def test_unlinked_radar_without_bot_configured(client, subscription, settings):
+def test_radar_bot_page_without_bot_configured(client, subscription, settings):
     settings.TELEGRAM_BOT_USERNAME = ""
-    html = html_of(client.get(url("detail", subscription)))
+    html = html_of(client.get(url("radar_bot", subscription)))
     assert url("connect", subscription) not in html
     assert "Бот ще не налаштований" in html
+
+
+def test_radar_bot_page_unknown_token_is_404(client):
+    assert client.get("/s/nope/bot/").status_code == 404
 
 
 def test_linked_radar_shows_settings_and_next_slot(client, linked, settings):
@@ -216,7 +273,7 @@ def test_linked_radar_shows_settings_and_next_slot(client, linked, settings):
     linked.save()
 
     with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
-        html = html_of(client.get(url("detail", linked)))
+        html = html_of(client.get(url("radar_bot", linked)))
 
     assert "Бот підключено" in html
     assert f"@{settings.TELEGRAM_BOT_USERNAME}" in html
@@ -357,7 +414,7 @@ def test_connect_without_bot_configured(client, subscription, settings):
 
 def test_connect_when_already_linked_redirects(client, linked):
     response = client.get(url("connect", linked))
-    assert response.status_code == 302 and response["Location"].endswith("#bot")
+    assert response.status_code == 302 and response["Location"] == url("radar_bot", linked)
 
 
 def test_link_status_waits_then_redirects_to_frequency(client, subscription):
@@ -401,7 +458,7 @@ def test_frequency_save_redirects_with_next_slot(client, linked):
         page = html_of(client.get(response["Location"]))
 
     linked.refresh_from_db()
-    assert response["Location"].endswith("#bot")
+    assert response["Location"] == url("detail", linked)  # "Зберегти і перейти до збігів"
     assert (linked.frequency, linked.quiet_hours_enabled) == ("every_6h", False)
     assert (linked.quiet_hours_start, linked.quiet_hours_end) == (23, 7)
     assert "Наступне сповіщення о 21:00" in page
@@ -461,7 +518,7 @@ def test_next_slot_preview_does_not_save(client, linked):
 def test_unlink(client, linked):
     response = client.post(url("unlink", linked))
     linked.refresh_from_db()
-    assert response.status_code == 302
+    assert response["Location"] == url("radar_bot", linked)
     assert linked.chat_id is None and linked.linked_at is None
 
 

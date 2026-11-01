@@ -220,7 +220,7 @@ a:hover { color: var(--lime-hover); }
 .r-trail { fill: var(--lime); }
 .r-beam { stroke: var(--lime); stroke-opacity: 0.85; stroke-width: 1.5; stroke-linecap: round; }
 .r-beam-glow { stroke: var(--lime); stroke-opacity: 0.45; stroke-width: 6; }
-.r-sweep { transform-origin: 220px 220px; animation: sweep var(--sweep, 6s) linear infinite; }
+.r-sweep { transform-origin: 220px 220px; animation: sweep var(--sweep, 9s) linear infinite; }
 .r-blip { fill: var(--lime); transform-box: fill-box; transform-origin: center; }
 .r-flash { fill: var(--lime); opacity: 0; }
 .r-ping { fill: none; stroke: var(--lime); stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
@@ -230,24 +230,21 @@ a:hover { color: var(--lime-hover); }
 @keyframes sweep { to { transform: rotate(360deg); } }
 
 /* Blips: each animation starts at --d, the moment the beam first reaches the blip,
-   and repeats once per turn. The trail covers ~28% of a turn, so a blip flares,
-   holds and has fully faded before the trail has passed it. */
-.r-hit, .r-hit > *, .r-label-in, .r-label-pulse {
-  animation-duration: var(--sweep, 6s); animation-delay: var(--d, 0s);
+   and repeats once per turn. The trail covers ~28% of a turn: a blip and its label
+   flare, stay while the trail covers them and are gone once it has passed. */
+.r-hit, .r-hit > * {
+  animation-duration: var(--sweep, 9s); animation-delay: var(--d, 0s);
   animation-iteration-count: infinite; animation-fill-mode: backwards;
 }
 .r-hit { animation-name: blip-life; animation-timing-function: linear; }
 .r-hit > .r-blip { animation-name: blip-pop; animation-timing-function: ease-out; }
 .r-hit > .r-flash { animation-name: blip-flash; animation-timing-function: ease-out; }
 .r-hit > .r-ping { animation-name: blip-ping; animation-timing-function: ease-out; }
-.r-label-in { animation: label-in 0.4s ease-out var(--d, 0s) backwards; }
-.r-label-pulse { animation-name: label-pulse; animation-timing-function: ease-in-out; }
-@keyframes blip-life { 0% { opacity: 0; } 1.5%, 9% { opacity: 1; } 26%, 100% { opacity: 0; } }
+@keyframes blip-life { 0% { opacity: 0; } 1.5%, 21% { opacity: 1; } 27%, 100% { opacity: 0; } }
 @keyframes blip-pop { 0% { transform: scale(0.3); } 2.5% { transform: scale(1.6); } 8%, 100% { transform: scale(1); } }
 @keyframes blip-flash { 0% { opacity: 0; } 1.5% { opacity: 0.9; } 10%, 100% { opacity: 0; } }
 @keyframes blip-ping { 0% { opacity: 0.8; transform: scale(0.5); } 15%, 100% { opacity: 0; transform: scale(2.2); } }
-@keyframes label-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes label-pulse { 0%, 10% { opacity: 1; } 32%, 100% { opacity: 0.55; } }
+
 
 .how { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 16px; }
 .how-card {
@@ -609,5 +606,5 @@ button.segmented-item:hover { color: var(--text); }
 @keyframes toast-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .r-sweep, .r-hit, .r-hit > *, .r-label-in, .r-label-pulse, .save-status, .pulse, .waiting-ping, .toast { animation: none; }
+  .r-sweep, .r-hit, .r-hit > *, .save-status, .pulse, .waiting-ping, .toast { animation: none; }
 }

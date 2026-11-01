@@ -5,6 +5,16 @@ import pytest
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def _empty_cache():
+    """The hero radar caches its picks; every test starts without them."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
 @pytest.fixture
 def load_fixture():
     def _load(name: str) -> bytes:

@@ -22,10 +22,11 @@ HTMX fragments:
 """
 
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.db.models import Max
 from django.http import HttpResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
@@ -34,7 +35,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from radar.matching import Filters
-from radar.models import Source
+from radar.models import Source, Vacancy
 from radar.search import fresh_feed, latest_vacancy_id, newer_than, search
 
 from . import schedule
@@ -46,7 +47,9 @@ TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 PAGE_SIZE = 20
 PREVIEW_SIZE = 8
 FEED_SIZE = 6
-HERO_BLIPS = 9
+HERO_BLIPS = 6  # every blip is a real vacancy with a label, so a few, not a crowd
+HERO_POOL = 80  # newest vacancies the hero picks from
+HERO_CACHE_SECONDS = 120
 FRESH_HOURS = 24
 VIEW_ALL, VIEW_NEW = "all", "new"
 
@@ -134,7 +137,7 @@ def _results_context(subscription, filters: Filters, page, **extra) -> dict:
 
 # Hero radar animation. The beam turns once per SWEEP_SECONDS; at rotation 0 its
 # leading edge points to BEAM_BEARING (degrees clockwise from 12 o'clock).
-SWEEP_SECONDS = 6.0
+SWEEP_SECONDS = 9.0
 BEAM_BEARING = 45.0
 TRAIL_DEGREES = 100.0  # long enough for a blip to fade while still inside the trail
 TRAIL_SLICES = 24
@@ -175,49 +178,85 @@ def radar_trail(size=440, radius=210) -> list[dict]:
     return slices
 
 
-def radar_blips(vacancies, *, now=None, size=440) -> list[dict]:
+def hero_vacancies(limit: int = HERO_BLIPS) -> list[tuple[str, datetime]]:
     """
-    Blips for the hero radar, newest first. Each next blip turns by the golden
-    angle and sits a bit further out, so they spread evenly, never overlap, and
-    the freshest are closest to the centre. The two newest get a label like
-    "Python · 2 хв". Each blip's animation is delayed until the beam reaches it,
-    so it lights up exactly as the beam passes and fades inside the trail.
+    (category, first seen) of the vacancies on the hero radar: taken in turns from
+    each DOU category (the freshest category first), so Python, JavaScript, Front End
+    ... all show up instead of six Python blips. One small query, cached for two
+    minutes: the home page is the most visited one, and the data changes every 30.
+    """
+    cached = cache.get("hero_vacancies")
+    if cached is not None:
+        return cached
+    pool = (
+        Vacancy.objects.active()
+        .prefetch_related("sources")
+        .order_by("-first_seen_at", "-id")[:HERO_POOL]
+    )
+    queues: dict[str, list[Vacancy]] = {}
+    for vacancy in pool:  # newest first, so every queue is newest first too
+        for category in vacancy.categories:
+            queues.setdefault(category, []).append(vacancy)
+    picked: list[tuple[str, Vacancy]] = []
+    used: set[int] = set()
+    while len(picked) < limit and any(queues.values()):
+        for category, queue in queues.items():  # dict order = freshest category first
+            while queue and queue[0].pk in used:
+                queue.pop(0)
+            if queue and len(picked) < limit:
+                vacancy = queue.pop(0)
+                used.add(vacancy.pk)
+                picked.append((category, vacancy))
+    picked.sort(key=lambda item: item[1].first_seen_at, reverse=True)
+    result = [(category, vacancy.first_seen_at) for category, vacancy in picked]
+    cache.set("hero_vacancies", result, HERO_CACHE_SECONDS)
+    return result
+
+
+def radar_blips(items, *, now=None, size=440) -> list[dict]:
+    """
+    Blips for the hero radar from (category, first seen) pairs, newest first. Every
+    blip is a vacancy with a label like "Python · 2 хв"; there are no decorative
+    dots. Each next blip turns by the golden angle and sits a bit further out, so
+    they spread evenly and the freshest are closest to the centre. A blip's
+    animation is delayed until the beam reaches it, so it lights up exactly as
+    the beam passes and is gone once the trail has passed.
     Numbers are strings, so Ukrainian number formatting can never turn "86.7"
     into "86,7" inside SVG attributes.
     """
     from .templatetags.radar_ui import ago_short
 
     now = now or timezone.now()
-    centre, inner, outer = size / 2, size * 0.2, size * 0.44
-    shown = list(vacancies[:HERO_BLIPS])
+    centre, inner, outer = size / 2, size * 0.2, size * 0.42
+    shown = list(items[:HERO_BLIPS])
     blips = []
-    for index, vacancy in enumerate(shown):
+    for index, (category, first_seen_at) in enumerate(shown):
         spread = (index / max(len(shown) - 1, 1)) ** 0.8
         radius = inner + spread * (outer - inner)
         bearing = (45 + index * 137.508) % 360  # golden angle; the first one upper right
         x, y = _polar(centre, centre, radius, bearing)
-        blip = {
-            "x": f"{x:.1f}",
-            "y": f"{y:.1f}",
-            "r": 6 if index == 0 else max(5 - index // 2, 3),
-            "opacity": f"{max(1 - index * 0.11, 0.35):.2f}",
-            "ring": index == 0,
-            "delay": f"{hit_delay(bearing):.2f}",
-        }
-        if index < 2:
-            category = vacancy.categories[0] if vacancy.categories else "DOU"
-            text = f"{category} · {ago_short(vacancy.first_seen_at, now)}"
-            width = 20 + len(text) * 7.3
-            label_x = x + 14 if x < size * 0.62 else x - 14 - width
-            blip["label"] = {
-                "text": text,
-                "x": f"{label_x:.1f}",
-                "y": f"{y - 14:.1f}",
-                "w": f"{width:.1f}",
-                "tx": f"{label_x + 10:.1f}",
-                "ty": f"{y + 5:.1f}",
+        text = f"{category} · {ago_short(first_seen_at, now)}"
+        width = 20 + len(text) * 7.3
+        fits_right = x + 14 + width <= size * 0.9  # stay inside the radar face
+        label_x = x + 14 if fits_right else max(x - 14 - width, 8)
+        label_y = min(max(y - 14, 14), size - 42)
+        blips.append(
+            {
+                "x": f"{x:.1f}",
+                "y": f"{y:.1f}",
+                "r": 6 if index == 0 else 5 if index < 3 else 4,
+                "ring": index == 0,
+                "delay": f"{hit_delay(bearing):.2f}",
+                "label": {
+                    "text": text,
+                    "x": f"{label_x:.1f}",
+                    "y": f"{label_y:.1f}",
+                    "w": f"{width:.1f}",
+                    "tx": f"{label_x + 10:.1f}",
+                    "ty": f"{label_y + 19:.1f}",
+                },
             }
-        blips.append(blip)
+        )
     return blips
 
 
@@ -240,7 +279,7 @@ def _cookie_radar(request) -> Subscription | None:
 def home(request):
     context = {
         "existing": _cookie_radar(request),
-        "blips": radar_blips(fresh_feed(limit=HERO_BLIPS)),
+        "blips": radar_blips(hero_vacancies()),
         "trail": radar_trail(),
         "sweep_seconds": f"{SWEEP_SECONDS:g}",
     }

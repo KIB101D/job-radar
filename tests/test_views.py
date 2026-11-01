@@ -9,7 +9,13 @@ from django.utils import timezone
 from radar.models import Source
 from subscriptions.models import Delivery, Frequency, Subscription
 from subscriptions.templatetags.radar_ui import ago, ago_short, places, uk_plural_form, where
-from subscriptions.views import BEAM_BEARING, SWEEP_SECONDS, TOKEN_COOKIE, hit_delay
+from subscriptions.views import (
+    BEAM_BEARING,
+    SWEEP_SECONDS,
+    TOKEN_COOKIE,
+    hero_vacancies,
+    hit_delay,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -173,15 +179,43 @@ def test_hero_blip_lights_up_when_the_beam_reaches_it():
     assert hit_delay(BEAM_BEARING - 1) == pytest.approx(SWEEP_SECONDS * 359 / 360)
 
 
-def test_hero_radar_renders_trail_and_beam_synced_blips(client, make_vacancy):
+def test_hero_radar_renders_trail_and_labelled_blips(client, make_vacancy):
     make_vacancy(title="Python dev")
     make_vacancy(title="Django dev")
     html = html_of(client.get("/"))
+    svg = html.split('class="hero-radar"', 1)[1].split("</svg>", 1)[0]
 
-    assert html.count('class="r-trail"') == 24
-    assert html.count('class="r-hit" style="--d: ') == 2
-    assert 'style="--d: 0.00s"' in html  # the newest blip sits under the beam
-    assert "," not in html.split('class="hero-radar"', 1)[1].split("</svg>", 1)[0].split("<text")[0]
+    assert svg.count('class="r-trail"') == 24
+    assert svg.count('class="r-hit" style="--d: ') == 2
+    assert svg.count('class="r-blip"') == 2  # only real vacancies, no decorative dots
+    assert svg.count('class="r-label-text">Python · ') == 2  # every blip has a label
+    assert 'style="--d: 0.00s"' in svg  # the newest blip sits under the beam
+    assert "," not in svg.split("<text")[0]
+
+
+def test_hero_takes_blips_in_turns_from_every_category(make_vacancy):
+    now = timezone.now()
+    for minutes in range(1, 6):
+        make_vacancy(title="Py", first_seen_at=now - timedelta(minutes=minutes))
+    make_vacancy(title="JS", categories=("JavaScript",), first_seen_at=now - timedelta(minutes=30))
+    make_vacancy(title="FE", categories=("Front End",), first_seen_at=now - timedelta(hours=3))
+
+    picked = hero_vacancies(limit=4)
+
+    assert sorted(category for category, _ in picked) == [
+        "Front End",
+        "JavaScript",
+        "Python",
+        "Python",
+    ]
+    assert [seen for _, seen in picked] == sorted((seen for _, seen in picked), reverse=True)
+
+
+def test_hero_picks_are_cached(make_vacancy, django_assert_num_queries):
+    make_vacancy(title="Py")
+    hero_vacancies()
+    with django_assert_num_queries(0):
+        hero_vacancies()
 
 
 # --- radar page ------------------------------------------------------------------------

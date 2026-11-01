@@ -7,6 +7,7 @@ from .models import Frequency, Subscription
 from .schedule import is_valid_timezone
 
 KEYWORDS_FIELD_MAX_LENGTH = 400
+FILTER_FIELDS = ("include_keywords", "exclude_keywords", "categories", "remote_only")
 
 FREQUENCY_HINTS = {
     Frequency.HOURLY: "Для активного пошуку, коли важлива кожна година",
@@ -113,7 +114,13 @@ class FiltersForm(forms.Form):
             # The browser's zone on creation; later changes come from the
             # notifications form, so editing filters abroad doesn't move digests.
             subscription.timezone = data["timezone"]
-        subscription.save()
+        if subscription.pk is None:
+            subscription.save()
+        else:
+            # Only the filter columns: a full save would write back every other
+            # column as loaded at the start of the request (pause, frequency...),
+            # undoing a change the bot made in the meantime.
+            subscription.save(update_fields=[*FILTER_FIELDS, "updated_at"])
         return subscription
 
 
@@ -159,5 +166,8 @@ class NotificationsForm(forms.ModelForm):
         if self.cleaned_data.get("timezone"):
             subscription.timezone = self.cleaned_data["timezone"]
         if commit:
-            subscription.save()
+            fields = [*self.Meta.fields, "updated_at"]
+            if self.cleaned_data.get("timezone"):
+                fields.append("timezone")
+            subscription.save(update_fields=fields)  # never touch columns the bot owns
         return subscription

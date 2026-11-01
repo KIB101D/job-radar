@@ -3,9 +3,22 @@ from django import forms
 from radar.matching import MAX_KEYWORD_LENGTH, MAX_KEYWORDS, parse_keywords
 from radar.models import Source
 
-from .models import Subscription
+from .models import Frequency, Subscription
+from .schedule import is_valid_timezone
 
 KEYWORDS_FIELD_MAX_LENGTH = 400
+
+FREQUENCY_HINTS = {
+    Frequency.HOURLY: "Для активного пошуку, коли важлива кожна година",
+    Frequency.EVERY_3H: "Баланс між швидкістю і тишею",
+    Frequency.EVERY_6H: "Кілька разів за день",
+    Frequency.EVERY_12H: "Зранку і ввечері: 09:00 і 21:00",
+    Frequency.DAILY: "Один дайджест о 09:00",
+    Frequency.OFF: "Лише ручна перевірка в боті",
+}
+RECOMMENDED_FREQUENCY = Frequency.EVERY_3H
+QUIET_START_CHOICES = [(h, f"{h:02d}:00") for h in (20, 21, 22, 23, 0)]
+QUIET_END_CHOICES = [(h, f"{h:02d}:00") for h in (6, 7, 8, 9, 10)]
 
 
 def category_choices() -> list[tuple[str, str]]:
@@ -18,28 +31,45 @@ def category_choices() -> list[tuple[str, str]]:
     return [(c, c) for c in categories]
 
 
+class TimezoneField(forms.CharField):
+    """Hidden field filled by the browser (Intl API). Invalid values are ignored."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("max_length", 50)
+        kwargs.setdefault("widget", forms.HiddenInput(attrs={"data-timezone": ""}))
+        super().__init__(**kwargs)
+
+    def clean(self, value):
+        value = super().clean(value)
+        return value if is_valid_timezone(value) else ""
+
+
 class FiltersForm(forms.Form):
     include_keywords = forms.CharField(
-        label="Шукати слова",
-        help_text="Через кому: python, django, junior. Підійде вакансія, де є хоча б одне.",
+        label="Ключові слова",
+        help_text="Підійде вакансія, де є хоча б одне з них.",
         required=False,
         max_length=KEYWORDS_FIELD_MAX_LENGTH,
-        widget=forms.TextInput(attrs={"placeholder": "python, django", "autocomplete": "off"}),
+        widget=forms.TextInput(
+            attrs={"placeholder": "Додати слово, напр. FastAPI", "autocomplete": "off"}
+        ),
     )
     exclude_keywords = forms.CharField(
-        label="Сховати вакансії зі словами",
-        help_text="Наприклад: senior, lead, php.",
+        label="Виключити слова",
+        help_text="Вакансії з цими словами не показуємо.",
         required=False,
         max_length=KEYWORDS_FIELD_MAX_LENGTH,
-        widget=forms.TextInput(attrs={"placeholder": "senior, lead", "autocomplete": "off"}),
+        widget=forms.TextInput(attrs={"placeholder": "Напр. senior, lead", "autocomplete": "off"}),
     )
     categories = forms.MultipleChoiceField(
-        label="Категорії",
-        help_text="Якщо нічого не вибрано, шукаємо в усіх.",
+        label="Категорії DOU",
+        help_text="Можна кілька. Якщо нічого не вибрано, шукаємо в усіх.",
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
     remote_only = forms.BooleanField(label="Тільки віддалено", required=False)
+    timezone = TimezoneField()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -79,5 +109,55 @@ class FiltersForm(forms.Form):
         subscription.exclude_keywords = data["exclude_keywords"]
         subscription.categories = sorted(data["categories"])
         subscription.remote_only = data["remote_only"]
+        if data.get("timezone") and subscription.pk is None:
+            # The browser's zone on creation; later changes come from the
+            # notifications form, so editing filters abroad doesn't move digests.
+            subscription.timezone = data["timezone"]
         subscription.save()
+        return subscription
+
+
+class NotificationsForm(forms.ModelForm):
+    """Frequency + quiet hours, shared by the radar page card and the step-3 page."""
+
+    quiet_hours_start = forms.TypedChoiceField(label="з", choices=QUIET_START_CHOICES, coerce=int)
+    quiet_hours_end = forms.TypedChoiceField(label="до", choices=QUIET_END_CHOICES, coerce=int)
+    timezone = TimezoneField()
+
+    class Meta:
+        model = Subscription
+        fields = ["frequency", "quiet_hours_enabled", "quiet_hours_start", "quiet_hours_end"]
+        widgets = {"frequency": forms.RadioSelect}
+        labels = {"frequency": "Автосповіщення", "quiet_hours_enabled": "Тихі години"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Keep a stored value selectable even if it's outside the default lists.
+        for name in ("quiet_hours_start", "quiet_hours_end"):
+            field = self.fields[name]
+            current = getattr(self.instance, name, None)
+            if current is not None and current not in dict(field.choices):
+                field.choices = sorted([*field.choices, (current, f"{current:02d}:00")])
+
+    def frequency_options(self):
+        """Radio options with design hints, for templates."""
+        current = self.data.get("frequency") if self.is_bound else self.instance.frequency
+        return [
+            {
+                "value": value,
+                "label": label,
+                "hint": FREQUENCY_HINTS[value],
+                "recommended": value == RECOMMENDED_FREQUENCY,
+                "checked": value == current,
+                "id": f"freq-{value}",
+            }
+            for value, label in Frequency.choices
+        ]
+
+    def save(self, commit=True):
+        subscription = super().save(commit=False)
+        if self.cleaned_data.get("timezone"):
+            subscription.timezone = self.cleaned_data["timezone"]
+        if commit:
+            subscription.save()
         return subscription

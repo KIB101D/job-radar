@@ -5,6 +5,7 @@ from datetime import datetime
 from django import template
 from django.utils import timezone
 
+from radar.matching import matched_keywords
 from radar.services.parser import REMOTE_LOCATION
 
 register = template.Library()
@@ -59,3 +60,41 @@ def places(location: str) -> str:
 def is_fresh(value: datetime, hours: int = 24) -> bool:
     """True if the moment is within the last `hours` hours (marks new vacancies)."""
     return bool(value) and (timezone.now() - value).total_seconds() < int(hours) * 3600
+
+
+def ago_short(value: datetime, now: datetime | None = None) -> str:
+    """Compact age for radar labels: '2 хв', '3 год', '4 д'."""
+    now = now or timezone.now()
+    seconds = max((now - value).total_seconds(), 0)
+    if seconds < 3600:
+        return f"{max(int(seconds // 60), 1)} хв"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)} год"
+    return f"{int(seconds // 86400)} д"
+
+
+@register.filter
+def where(vacancy) -> str:
+    """'Київ, Львів · віддалено', 'Віддалено', 'Київ' or ''."""
+    cities = places(vacancy.location)
+    if vacancy.is_remote:
+        return f"{cities} · віддалено" if cities else "Віддалено"
+    return cities
+
+
+@register.simple_tag
+def vacancy_tags(vacancy, filters) -> list[str]:
+    """Card tags: the user's keywords this vacancy matched, else its DOU categories."""
+    if filters is not None and filters.include:
+        found = matched_keywords(filters, title=vacancy.title, description=vacancy.description_text)
+        if found:
+            return found
+    return vacancy.categories
+
+
+@register.simple_tag
+def card_state(vacancy, seen_ids, fresh_after) -> dict:
+    """{'seen': delivered to Telegram, 'new': first seen recently and not delivered}."""
+    seen = vacancy.pk in (seen_ids or ())
+    is_new = not seen and fresh_after is not None and vacancy.first_seen_at > fresh_after
+    return {"seen": seen, "new": is_new}

@@ -1,13 +1,15 @@
 {% load radar_ui %}<section id="feed" class="feed" aria-labelledby="feed-title"
          hx-get="{% url 'subscriptions:feed' %}" hx-trigger="every 180s[document.visibilityState === 'visible']" hx-swap="outerHTML">
-  <h2 id="feed-title" class="section-title">Свіжі вакансії</h2>
-  <p class="section-note">Найновіші з усіх категорій, без твоїх фільтрів.</p>
+  <h3 id="feed-title" class="feed-title">Свіжі вакансії</h3>
+  <p class="field-help">Найновіші з усіх категорій, без твоїх фільтрів.</p>
+  <ul class="feed-list">
   {% for vacancy in feed %}
-    <a class="feed-item" href="{{ vacancy.url }}" target="_blank" rel="noopener">
-      <span class="feed-title">{{ vacancy.title }}</span>
-      <span class="feed-meta">{% if vacancy.company %}{{ vacancy.company }}, {% endif %}{{ vacancy.first_seen_at|ago }}</span>
-    </a>
+    <li><a class="feed-item" href="{{ vacancy.url }}" target="_blank" rel="noopener">
+      <span class="feed-item-title">{{ vacancy.title }}</span>
+      <span class="feed-item-meta">{% if vacancy.company %}{{ vacancy.company }}, {% endif %}<span class="mono">{{ vacancy.first_seen_at|ago }}</span></span>
+    </a></li>
   {% empty %}
-    <p class="empty">База ще порожня. Вакансії з'являться після першого оновлення.</p>
+    <li class="field-help">База ще порожня. Вакансії з'являться після першого оновлення.</li>
   {% endfor %}
+  </ul>
 </section>

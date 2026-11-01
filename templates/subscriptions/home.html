@@ -1,24 +1,94 @@
 {% extends "base.html" %}
+{% load radar_ui %}
 
-{% block topbar_extra %}
-  {% if existing %}
-    <a class="topbar-link" href="{% url 'subscriptions:detail' existing.token %}">Мій радар</a>
-  {% endif %}
-{% endblock %}
+{% block title %}Job Radar: персональний радар IT-вакансій{% endblock %}
+{% block nav_filters %}#filters{% endblock %}
+{% block nav_bot %}#bot{% endblock %}
 
 {% block content %}
-<div class="home">
-  <section class="intro">
-    {% include "subscriptions/_scope.html" with label="Радар з найсвіжішими вакансіями" %}
-    <h1 class="display">Нові вакансії з DOU знайдуть тебе самі.</h1>
-    <p class="lede">Вкажи слова, які тобі важливі. Сайт показуватиме збіги щойно вони з'являться, а Telegram-бот надішле їх тоді, коли тобі зручно.</p>
-  </section>
+<section id="top" class="section hero" aria-label="Головна">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow">DOU · RSS · оновлення наживо</p>
+      <h1 class="display">Персональний радар вакансій</h1>
+      <p class="lead lead-lg">Налаштуй фільтри один раз: збіги оновлюються на сторінці самі, без перезавантаження. Підключи Telegram-бота одним кліком і отримуй нове з тією частотою, яка зручна тобі.</p>
+      <div class="actions">
+        {% if existing %}
+          <a class="btn btn-primary btn-lg" href="{% url 'subscriptions:detail' existing.token %}">Відкрити мій радар</a>
+        {% else %}
+          <a class="btn btn-primary btn-lg" href="#filters">Налаштувати фільтри</a>
+        {% endif %}
+        <a class="btn btn-outline btn-lg" href="{% if existing %}{% url 'subscriptions:detail' existing.token %}{% endif %}#bot"><span class="tg-blue">{% include "components/icons.html" with name="telegram" %}</span>Підключити бота</a>
+      </div>
+      <ul class="checklist">
+        <li>{% include "components/icons.html" with name="check" %}Одна підписка для сайту і бота</li>
+        <li>{% include "components/icons.html" with name="check" %}Автосповіщення від щогодини до раз на день</li>
+        <li>{% include "components/icons.html" with name="check" %}Ручна перевірка будь-коли</li>
+      </ul>
+    </div>
+    <div class="hero-visual">{% include "subscriptions/_radar.html" %}</div>
 
-  <section class="panel" aria-labelledby="form-title">
-    <h2 id="form-title" class="section-title">Налаштуй фільтри</h2>
-    {% include "subscriptions/_form.html" with submit_label="Створити радар" %}
-  </section>
+    <div class="how">
+      <div class="how-card">
+        <div class="how-num mono">01</div>
+        <h3 class="h3">Фільтри</h3>
+        <p>Ключові слова, слова-виключення, категорії DOU і віддалена робота. Збіги з'являються одразу під фільтрами і оновлюються самі.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num mono">02</div>
+        <h3 class="h3">Бот одним кліком</h3>
+        <p>Кнопка відкриває Telegram, тиснеш Start і одразу отримуєш першу пачку вакансій за своїми фільтрами.</p>
+      </div>
+      <div class="how-card how-card-accent">
+        <div class="how-card-top"><div class="how-num mono">03</div><span class="pill-lime">Головне</span></div>
+        <h3 class="h3">Автосповіщення</h3>
+        <p>Обираєш, як часто радар надсилає нове: щогодини, кожні 3, 6, 12 год або раз на день. А перевірити вручну можна будь-коли.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-  {% include "subscriptions/_feed.html" %}
-</div>
+<section id="filters" class="section" aria-labelledby="filters-title">
+  <div class="wrap stack-lg">
+    <div class="section-head">
+      <p class="eyebrow">Фільтри</p>
+      <h2 id="filters-title" class="h2">Що шукає твій радар</h2>
+      <p class="lead">Змінюй фільтри, і збіги оновляться одразу, ще до збереження. Ті самі фільтри використовуватиме бот у Telegram.</p>
+    </div>
+    <div class="workspace">
+      {% include "subscriptions/_filters_form.html" with submit_label="Створити радар" submit_hint="Збіги оновлюються наживо, а радар запам'ятає фільтри" %}
+      <section id="matches" class="matches" aria-labelledby="matches-title">
+        <div class="matches-head">
+          <div class="matches-title-row">
+            <h3 id="matches-title" class="h3">Збіги</h3>
+            <span id="match-count" class="count-pill mono">{{ page.total }}</span>
+            <span class="live"><span class="dot dot-lime pulse" aria-hidden="true"></span><span class="live-label">Live</span>{% include "subscriptions/_live_stamp.html" %}</span>
+          </div>
+        </div>
+        {% include "subscriptions/_results.html" %}
+      </section>
+    </div>
+  </div>
+</section>
+
+<section id="bot" class="section section-alt" aria-labelledby="bot-title">
+  <div class="wrap bot-grid">
+    {% include "subscriptions/_bot_intro.html" %}
+    <div class="panel bot-card">
+      <div class="bot-card-head">
+        <div class="bot-avatar">{% include "components/icons.html" with name="telegram" %}</div>
+        <div class="bot-card-who">
+          <div class="bot-card-title">Як підключити</div>
+          <div class="field-help">Спершу збережи фільтри, далі один клік</div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><span class="step-num mono">01</span><span>Створи радар з фільтрами вище</span></li>
+        <li><span class="step-num mono">02</span><span>Натисни «Підключити бота» і Start у Telegram. Бот одразу надішле першу пачку збігів</span></li>
+        <li><span class="step-num mono step-num-lime">03</span><span>Обери частоту: щогодини, кожні 3, 6, 12 год або раз на день о 09:00</span></li>
+      </ol>
+      <a class="btn btn-primary" href="{% if existing %}{% url 'subscriptions:detail' existing.token %}#bot{% else %}#filters{% endif %}">{% if existing %}До мого радару{% else %}Налаштувати фільтри{% endif %}</a>
+    </div>
+  </div>
+</section>
 {% endblock %}

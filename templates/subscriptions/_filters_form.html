@@ -1,0 +1,54 @@
+{% load radar_ui %}{% comment %}
+  Filter form card. Changes refresh the matches next to it (preview, not saved);
+  the submit button saves. Keyword fields are plain comma-separated inputs that
+  static/js/app.js turns into removable chips.
+
+  Params: form, submit_label, subscription (optional).
+{% endcomment %}<form method="post" class="panel filters" novalidate
+      aria-label="Фільтри вакансій"
+      hx-get="{% url 'subscriptions:preview' %}"
+      hx-trigger="change delay:150ms"
+      hx-target="#results" hx-swap="outerHTML"
+      hx-indicator="#matches">
+  {% csrf_token %}
+  {% if subscription %}<input type="hidden" name="token" value="{{ subscription.token }}">{% endif %}
+  {{ form.timezone }}
+
+  <div class="filters-head">
+    <h3 class="filters-title">{% include "components/icons.html" with name="sliders" %}Параметри</h3>
+    <button type="button" class="link-btn" data-reset-filters>Скинути</button>
+  </div>
+
+  {% if form.non_field_errors %}<p class="field-error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+
+  <div class="field">
+    <label class="field-label" for="{{ form.include_keywords.id_for_label }}">{{ form.include_keywords.label }}</label>
+    <div class="chips-field" data-chips>{{ form.include_keywords }}</div>
+    <p class="field-help">{{ form.include_keywords.help_text }}</p>
+    {% for error in form.include_keywords.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="{{ form.exclude_keywords.id_for_label }}">{{ form.exclude_keywords.label }}</label>
+    <div class="chips-field chips-exclude" data-chips>{{ form.exclude_keywords }}</div>
+    {% for error in form.exclude_keywords.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <fieldset class="field">
+    <legend class="field-label">{{ form.categories.label }}</legend>
+    <div class="toggle-chips">
+      {% for choice in form.categories %}
+        <label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+      {% endfor %}
+    </div>
+    <p class="field-help">{{ form.categories.help_text }}</p>
+    {% for error in form.categories.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </fieldset>
+
+  <label class="check">{{ form.remote_only }}<span>{{ form.remote_only.label }}</span></label>
+
+  <div class="filters-submit">
+    <button type="submit" class="btn btn-primary btn-block">{{ submit_label }}</button>
+    <p class="field-help center">{{ submit_hint }}</p>
+  </div>
+</form>

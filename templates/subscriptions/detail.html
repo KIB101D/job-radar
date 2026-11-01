@@ -2,41 +2,43 @@
 {% load radar_ui %}
 
 {% block title %}Мій радар | Job Radar{% endblock %}
+{% block nav_filters %}#filters{% endblock %}
+{% block nav_bot %}#bot{% endblock %}
 
 {% block content %}
-<div class="radar">
-  <h1 class="display display-sm radar-title">Мій радар</h1>
-  <aside class="side">
-    <div class="side-scope">
-      {% include "subscriptions/_scope.html" with label="Радар з твоїми останніми збігами" %}
-      <p class="side-readout">На радарі {{ page.total }} {{ page.total|uk_plural:"вакансія,вакансії,вакансій" }} за твоїми фільтрами.</p>
+<section id="filters" class="section section-first" aria-labelledby="filters-title">
+  <div class="wrap stack-lg">
+    <div class="section-head">
+      <p class="eyebrow">Мій радар</p>
+      <h1 id="filters-title" class="h2">Що шукає твій радар</h1>
+      <p class="lead">Змінюй фільтри, і збіги оновляться одразу, ще до збереження. Ті самі фільтри використовує бот у Telegram.</p>
     </div>
-
-    <div class="telegram">
-      {% if subscription.is_linked %}
-        <p class="telegram-state">Telegram підключено. Частоту сповіщень змінюй у боті.</p>
-        {% if bot_link %}<a class="btn btn-quiet" href="{{ bot_link }}" target="_blank" rel="noopener">Відкрити бота</a>{% endif %}
-      {% elif telegram_link %}
-        <a class="btn btn-primary" href="{{ telegram_link }}" target="_blank" rel="noopener">Отримувати в Telegram</a>
-        <p class="field-help">Бот надішле 5 найсвіжіших збігів і запитає, як часто писати далі.</p>
-      {% else %}
-        <button class="btn btn-primary" type="button" disabled>Отримувати в Telegram</button>
-        <p class="field-help">Бот ще не налаштований на цьому сервері.</p>
-      {% endif %}
+    <div class="workspace">
+      <div class="stack">
+        {% include "subscriptions/_filters_form.html" with submit_label="Зберегти фільтри" submit_hint="Радар і бот шукатимуть саме так" %}
+        <p class="field-help bookmark">Збережи адресу цієї сторінки: за нею ти повернешся до своїх фільтрів з будь-якого пристрою. Не ділися нею з іншими.</p>
+      </div>
+      <section id="matches" class="matches" aria-labelledby="matches-title">
+        <div class="matches-head">
+          <div class="matches-title-row">
+            <h2 id="matches-title" class="h3">Збіги</h2>
+            <span id="match-count" class="count-pill mono">{{ page.total }}</span>
+            <span class="live"><span class="dot dot-lime pulse" aria-hidden="true"></span><span class="live-label">Live</span>{% include "subscriptions/_live_stamp.html" %}</span>
+          </div>
+          {% include "subscriptions/_new_tab.html" with new_count=0 %}
+        </div>
+        {% include "subscriptions/_results.html" with since_id=None %}
+        {% include "subscriptions/_live_poller.html" %}
+        {% include "subscriptions/_feed.html" %}
+      </section>
     </div>
-
-    <details class="side-filters" {% if form.errors %}open{% endif %}>
-      <summary>Змінити фільтри</summary>
-      {% include "subscriptions/_form.html" with submit_label="Зберегти фільтри" %}
-    </details>
-
-    <p class="bookmark">Збережи адресу цієї сторінки. За нею ти повернешся до своїх фільтрів з будь-якого пристрою, тому не ділися нею з іншими.</p>
-  </aside>
-
-  <div class="main">
-    {% include "subscriptions/_banner.html" with count=0 %}
-    {% include "subscriptions/_results.html" with append=False since_id=None %}
-    {% include "subscriptions/_feed.html" %}
   </div>
-</div>
+</section>
+
+<section id="bot" class="section section-alt" aria-labelledby="bot-title">
+  <div class="wrap bot-grid">
+    {% include "subscriptions/_bot_intro.html" %}
+    <div>{% include "subscriptions/_bot_settings.html" %}</div>
+  </div>
+</section>
 {% endblock %}

@@ -1,0 +1,79 @@
+{% comment %}
+  Telegram card on the radar page.
+  - not linked: what happens after Start + a button to the connect step;
+  - linked: frequency and quiet hours, auto-saved on change (HTMX), next slot.
+  Params: subscription, notifications_form, bot_username, deep_link, next_slot, tz_label, saved.
+{% endcomment %}<div id="bot-card" class="panel bot-card">
+{% if subscription.is_linked %}
+  <div class="bot-card-head">
+    <div class="bot-avatar">{% include "components/icons.html" with name="telegram" %}</div>
+    <div class="bot-card-who">
+      <div class="bot-card-title">Бот підключено</div>
+      {% if bot_username %}<div class="bot-card-handle"><span class="dot dot-lime" aria-hidden="true"></span><span class="mono">@{{ bot_username }}</span></div>{% endif %}
+    </div>
+    <form method="post" action="{% url 'subscriptions:unlink' subscription.token %}">
+      {% csrf_token %}
+      <button type="submit" class="link-btn underline">Відключити</button>
+    </form>
+  </div>
+
+  {% with form=notifications_form %}
+  <form class="bot-settings" method="post"
+        hx-post="{% url 'subscriptions:notifications' subscription.token %}"
+        hx-trigger="change" hx-target="#bot-card" hx-swap="outerHTML">
+    {% csrf_token %}
+    {{ form.timezone }}
+    <fieldset class="field">
+      <legend class="field-label-strong">Автосповіщення</legend>
+      <p class="field-help">Як часто бот надсилає нові збіги</p>
+      <div class="freq-grid freq-grid-compact">
+        {% for option in form.frequency_options %}
+          <label class="freq-option{% if option.checked %} is-checked{% endif %}">
+            <input type="radio" name="frequency" value="{{ option.value }}"{% if option.checked %} checked{% endif %}>
+            <span>{{ option.label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      <p class="mono next-slot" id="next-slot-card">{% if next_slot %}Наступне сповіщення {{ next_slot }} <span class="tz">({{ tz_label }})</span>{% else %}Автосповіщення вимкнено{% endif %}</p>
+    </fieldset>
+
+    <div class="setting-row">
+      <div>
+        <div class="setting-title" id="quiet-label-card">Тихі години</div>
+        <div class="quiet-range">
+          <label class="sr-only" for="qs-card">Тихі години з</label>
+          <select id="qs-card" name="quiet_hours_start" class="select select-sm mono">{% for value, label in form.fields.quiet_hours_start.choices %}<option value="{{ value }}"{% if value == subscription.quiet_hours_start %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <span aria-hidden="true">–</span>
+          <label class="sr-only" for="qe-card">до</label>
+          <select id="qe-card" name="quiet_hours_end" class="select select-sm mono">{% for value, label in form.fields.quiet_hours_end.choices %}<option value="{{ value }}"{% if value == subscription.quiet_hours_end %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" role="switch" name="quiet_hours_enabled" aria-labelledby="quiet-label-card"{% if subscription.quiet_hours_enabled %} checked{% endif %}>
+        <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+      </label>
+    </div>
+    <noscript><button type="submit" class="btn btn-outline">Зберегти</button></noscript>
+    {% if saved %}<p class="saved-note" role="status">Збережено</p>{% endif %}
+  </form>
+  {% endwith %}
+{% else %}
+  <div class="bot-card-head">
+    <div class="bot-avatar">{% include "components/icons.html" with name="telegram" %}</div>
+    <div class="bot-card-who">
+      <div class="bot-card-title">Підключи Telegram</div>
+      <div class="field-help">Один клік, і радар писатиме тобі сам</div>
+    </div>
+  </div>
+  <ol class="steps">
+    <li><span class="step-num mono">01</span><span>Бот прив'яже Telegram до твоєї підписки і надішле першу пачку збігів</span></li>
+    <li><span class="step-num mono step-num-lime">02</span><span>Запропонує вибрати частоту автосповіщень. Це перший і головний крок</span></li>
+    <li><span class="step-num mono">03</span><span>Будь-які зміни на сайті чи в боті синхронізуються автоматично</span></li>
+  </ol>
+  {% if bot_username %}
+    <a class="btn btn-blue" href="{% url 'subscriptions:connect' subscription.token %}">{% include "components/icons.html" with name="telegram" %}Підключити бота</a>
+  {% else %}
+    <p class="field-help">Бот ще не налаштований на цьому сервері.</p>
+  {% endif %}
+{% endif %}
+</div>

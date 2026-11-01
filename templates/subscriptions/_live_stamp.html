@@ -1,0 +1,1 @@
+{% load radar_ui %}<span id="live-stamp" class="mono live-stamp"{% if oob %} hx-swap-oob="true"{% endif %}>{% if last_fetched_at %}оновлено {{ last_fetched_at|ago }}{% else %}ще не оновлювалось{% endif %}</span>

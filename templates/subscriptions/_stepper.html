@@ -1,0 +1,8 @@
+{% comment %}Setup steps in the header of the connect/frequency pages. Param: step (2 or 3).{% endcomment %}
+<ol class="stepper" aria-label="Кроки налаштування">
+  <li class="is-done"><span class="step-dot">{% include "components/icons.html" with name="check" %}</span>Фільтри</li>
+  <li class="step-line{% if step == 3 %} is-done{% endif %}" aria-hidden="true"></li>
+  <li class="{% if step == 2 %}is-current is-blue{% else %}is-done{% endif %}"{% if step == 2 %} aria-current="step"{% endif %}><span class="step-dot mono">{% if step == 2 %}2{% else %}{% include "components/icons.html" with name="check" %}{% endif %}</span>Telegram</li>
+  <li class="step-line{% if step == 3 %} is-done{% endif %}" aria-hidden="true"></li>
+  <li class="{% if step == 3 %}is-current{% endif %}"{% if step == 3 %} aria-current="step"{% endif %}><span class="step-dot mono">3</span>Частота</li>
+</ol>

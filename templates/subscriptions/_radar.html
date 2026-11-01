@@ -1,0 +1,20 @@
+{% load l10n %}{% localize off %}<svg class="hero-radar" viewBox="0 0 440 440" role="img" aria-label="Радар: найсвіжіші вакансії ближче до центру">
+  <circle cx="220" cy="220" r="210" class="r-face"/>
+  <circle cx="220" cy="220" r="158" class="r-ring"/>
+  <circle cx="220" cy="220" r="106" class="r-ring"/>
+  <circle cx="220" cy="220" r="54" class="r-ring"/>
+  <path d="M10 220H430M220 10V430" class="r-axis"/>
+  <g class="r-sweep">
+    <path d="M220 220 L220 10 A210 210 0 0 1 368.5 71.5 Z" class="r-wedge"/>
+    <path d="M220 220 L368.5 71.5" class="r-beam"/>
+  </g>
+  {% for b in blips %}
+    <circle cx="{{ b.x }}" cy="{{ b.y }}" r="{{ b.r }}" class="r-blip" fill-opacity="{{ b.opacity }}"/>
+    {% if b.ring %}<circle cx="{{ b.x }}" cy="{{ b.y }}" r="12" class="r-blip-ring"/>{% endif %}
+    {% if b.label %}
+      <rect x="{{ b.label.x }}" y="{{ b.label.y }}" width="{{ b.label.w }}" height="28" rx="6" class="r-label"/>
+      <text x="{{ b.label.tx }}" y="{{ b.label.ty }}" class="r-label-text">{{ b.label.text }}</text>
+    {% endif %}
+  {% endfor %}
+  <circle cx="220" cy="220" r="4" class="r-centre"/>
+</svg>{% endlocalize %}

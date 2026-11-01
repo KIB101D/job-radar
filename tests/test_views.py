@@ -1,8 +1,14 @@
-import pytest
-from django.urls import reverse
+from datetime import timedelta
+from types import SimpleNamespace
 
-from subscriptions.models import Delivery, Subscription
-from subscriptions.templatetags.radar_ui import ago, places, uk_plural_form
+import pytest
+import time_machine
+from django.urls import reverse
+from django.utils import timezone
+
+from radar.models import Source
+from subscriptions.models import Delivery, Frequency, Subscription
+from subscriptions.templatetags.radar_ui import ago, ago_short, places, uk_plural_form, where
 from subscriptions.views import TOKEN_COOKIE
 
 pytestmark = pytest.mark.django_db
@@ -13,26 +19,59 @@ def subscription():
     return Subscription.objects.create(include_keywords=["python"], categories=["Python"])
 
 
-def detail_url(sub, name="detail"):
-    return reverse(f"subscriptions:{name}", args=[sub.token])
+@pytest.fixture
+def linked(subscription):
+    subscription.chat_id = 42
+    subscription.linked_at = timezone.now()
+    subscription.save()
+    return subscription
 
 
-# --- home / create ---------------------------------------------------------------
+def url(name, sub=None, query=""):
+    args = [sub.token] if sub else []
+    return reverse(f"subscriptions:{name}", args=args) + query
 
 
-def test_home_shows_form_and_fresh_feed(client, make_vacancy):
+def html_of(response) -> str:
+    return response.content.decode()
+
+
+def results_block(html: str) -> str:
+    """Only the matches list, without the unfiltered 'Свіжі вакансії' feed."""
+    return html.split('id="results"', 1)[1].split('id="feed"', 1)[0]
+
+
+# --- landing -------------------------------------------------------------------------
+
+
+def test_home_has_hero_filters_preview_and_bot_section(client, make_vacancy):
     make_vacancy(title="Fresh Python Role")
 
-    response = client.get("/")
+    html = html_of(client.get("/"))
 
-    assert response.status_code == 200
-    html = response.content.decode()
+    assert "Персональний радар вакансій" in html
     assert "Створити радар" in html
-    assert "Свіжі вакансії" in html
-    assert "Fresh Python Role" in html
+    assert "Fresh Python Role" in html  # live preview of matches
+    assert 'id="bot"' in html and "Як підключити" in html
 
 
-def test_create_subscription_sets_cookie_and_redirects(client):
+def test_home_hides_features_that_do_not_exist_yet(client):
+    html = html_of(client.get("/"))
+    for stub in ("Досвід", "Зарплата від", "Збережені", "Бот підключено", "Зберегти вакансію"):
+        assert stub not in html
+
+
+def test_home_preview_is_limited_and_invites_to_create(client, make_vacancy):
+    for i in range(12):
+        make_vacancy(title=f"Role {i}")
+
+    html = html_of(client.get("/"))
+
+    assert results_block(html + 'id="feed"').count("<article") == 8
+    assert "Ще 4 вакансії за цими фільтрами" in html
+
+
+def test_create_subscription_sets_cookie_timezone_and_redirects(client):
     response = client.post(
         "/",
         {
@@ -40,24 +79,25 @@ def test_create_subscription_sets_cookie_and_redirects(client):
             "exclude_keywords": "senior",
             "categories": ["Python", "Front End"],
             "remote_only": "on",
+            "timezone": "Europe/Madrid",
         },
     )
 
     sub = Subscription.objects.get()
     assert response.status_code == 302
-    assert response["Location"] == detail_url(sub)
+    assert response["Location"] == url("detail", sub)
     assert response.cookies[TOKEN_COOKIE].value == sub.token
     assert response.cookies[TOKEN_COOKIE]["httponly"]
     assert sub.include_keywords == ["python", "django"]
     assert sub.exclude_keywords == ["senior"]
     assert sub.categories == ["Front End", "Python"]
     assert sub.remote_only is True
+    assert sub.timezone == "Europe/Madrid"
 
 
-def test_empty_form_is_valid_and_means_everything(client):
-    client.post("/", {})
-    sub = Subscription.objects.get()
-    assert (sub.include_keywords, sub.categories, sub.remote_only) == ([], [], False)
+def test_unknown_timezone_from_browser_is_ignored(client):
+    client.post("/", {"timezone": "Mars/Olympus"})
+    assert Subscription.objects.get().timezone == "Europe/Kyiv"
 
 
 @pytest.mark.parametrize(
@@ -73,21 +113,17 @@ def test_invalid_input_is_rejected(client, data, error):
     response = client.post("/", data)
 
     assert response.status_code == 200
-    assert error in response.content.decode()
+    assert error in html_of(response)
     assert Subscription.objects.count() == 0
 
 
-def test_home_links_back_to_existing_radar(client, subscription):
+def test_home_links_to_existing_radar(client, subscription):
     client.cookies[TOKEN_COOKIE] = subscription.token
-    assert detail_url(subscription) in client.get("/").content.decode()
+    html = html_of(client.get("/"))
+    assert "Відкрити мій радар" in html and url("detail", subscription) in html
 
 
-# --- subscription page ---------------------------------------------------------------
-
-
-def results_block(html: str) -> str:
-    """Just the results list, without the unfiltered 'Свіжі вакансії' feed."""
-    return html.split('id="results"', 1)[1].split('id="feed"', 1)[0]
+# --- radar page ------------------------------------------------------------------------
 
 
 def test_detail_shows_only_matching_vacancies(client, subscription, make_vacancy):
@@ -95,14 +131,37 @@ def test_detail_shows_only_matching_vacancies(client, subscription, make_vacancy
     make_vacancy(title="Java Developer")
     make_vacancy(title="Python in wrong category", categories=["JavaScript"])
 
-    html = client.get(detail_url(subscription)).content.decode()
+    html = html_of(client.get(url("detail", subscription)))
     results = results_block(html)
 
     assert "Junior Python Developer" in results
     assert "Java Developer" not in results
     assert "Python in wrong category" not in results
-    assert "На радарі 1 вакансія" in html
+    assert '<span id="match-count" class="count-pill mono">1</span>' in html
     assert "Java Developer" in html.split('id="feed"', 1)[1]  # the feed ignores filters
+
+
+def test_card_shows_matched_keywords_new_badge_and_salary(client, make_vacancy):
+    sub = Subscription.objects.create(include_keywords=["django", "python"])
+    make_vacancy(
+        title="Python dev",
+        description_text="Django and DRF",
+        salary_text="$800–1200",
+        is_remote=True,
+        location="Київ, віддалено",
+    )
+
+    html = results_block(html_of(client.get(url("detail", sub))))
+
+    assert ">django</span>" in html and ">python</span>" in html
+    assert "Нова" in html and "is-new" in html
+    assert "$800–1200" in html
+    assert "Київ · віддалено" in html
+
+
+def test_old_vacancy_has_no_new_badge(client, subscription, make_vacancy):
+    make_vacancy(title="Python", first_seen_at=timezone.now() - timedelta(days=3))
+    assert "is-new" not in results_block(html_of(client.get(url("detail", subscription))))
 
 
 def test_detail_unknown_token_is_404(client):
@@ -110,115 +169,303 @@ def test_detail_unknown_token_is_404(client):
 
 
 def test_detail_refreshes_cookie(client, subscription):
-    response = client.get(detail_url(subscription))
+    response = client.get(url("detail", subscription))
     assert response.cookies[TOKEN_COOKIE].value == subscription.token
 
 
 def test_update_filters(client, subscription):
     response = client.post(
-        detail_url(subscription), {"include_keywords": "django", "categories": ["Python"]}
+        url("detail", subscription), {"include_keywords": "django", "categories": ["Python"]}
     )
 
     subscription.refresh_from_db()
     assert response.status_code == 302
     assert subscription.include_keywords == ["django"]
-    assert "Фільтри збережено" in client.get(response["Location"]).content.decode()
+    assert "Фільтри збережено" in html_of(client.get(response["Location"]))
+
+
+def test_editing_filters_does_not_change_timezone(client, subscription):
+    client.post(url("detail", subscription), {"timezone": "America/New_York"})
+    subscription.refresh_from_db()
+    assert subscription.timezone == "Europe/Kyiv"
 
 
 def test_update_with_errors_keeps_old_filters(client, subscription):
-    response = client.post(detail_url(subscription), {"include_keywords": "y" * 500})
+    response = client.post(url("detail", subscription), {"include_keywords": "y" * 500})
 
     subscription.refresh_from_db()
     assert response.status_code == 200
     assert subscription.include_keywords == ["python"]
 
 
-def test_telegram_deep_link(client, subscription, settings):
-    html = client.get(detail_url(subscription)).content.decode()
-    assert f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start={subscription.token}" in html
+def test_unlinked_radar_offers_to_connect_bot(client, subscription):
+    html = html_of(client.get(url("detail", subscription)))
+    assert url("connect", subscription) in html
+    assert "Бот підключено" not in html
 
 
-def test_telegram_button_disabled_without_bot(client, subscription, settings):
+def test_unlinked_radar_without_bot_configured(client, subscription, settings):
     settings.TELEGRAM_BOT_USERNAME = ""
-    html = client.get(detail_url(subscription)).content.decode()
-    assert "?start=" not in html
+    html = html_of(client.get(url("detail", subscription)))
+    assert url("connect", subscription) not in html
     assert "Бот ще не налаштований" in html
 
 
-def test_linked_chat_shows_state_instead_of_deep_link(client, subscription):
-    subscription.chat_id = 42
-    subscription.save()
+def test_linked_radar_shows_settings_and_next_slot(client, linked, settings):
+    linked.frequency = Frequency.EVERY_3H
+    linked.save()
 
-    html = client.get(detail_url(subscription)).content.decode()
+    with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
+        html = html_of(client.get(url("detail", linked)))
 
-    assert "Telegram підключено" in html
-    assert "?start=" not in html
+    assert "Бот підключено" in html
+    assert f"@{settings.TELEGRAM_BOT_USERNAME}" in html
+    assert "Наступне сповіщення о 18:00" in html and "(Kyiv)" in html
+    assert 'value="every_3h" checked' in html
+    assert "Відключити" in html
 
 
-def test_delivered_vacancies_are_marked_seen(client, subscription, make_vacancy):
+def test_delivered_vacancies_are_marked_seen(client, linked, make_vacancy):
     sent = make_vacancy(title="Python sent")
     make_vacancy(title="Python not sent")
-    subscription.chat_id = 42
-    subscription.save()
-    Delivery.objects.create(subscription=subscription, vacancy=sent)
+    Delivery.objects.create(subscription=linked, vacancy=sent)
 
-    html = client.get(detail_url(subscription)).content.decode()
+    html = results_block(html_of(client.get(url("detail", linked))))
 
     assert html.count("is-seen") == 1
-    assert "Надіслано в Telegram" in html
+    assert "у Telegram" in html
 
 
-# --- HTMX partials ------------------------------------------------------------------
+# --- HTMX fragments --------------------------------------------------------------------
 
 
-def test_results_partial_paginates(client, subscription, make_vacancy):
+def test_results_paginates_with_remaining_count(client, subscription, make_vacancy):
     for i in range(25):
         make_vacancy(title=f"Python role {i}")
 
-    first = client.get(detail_url(subscription, "results")).content.decode()
-    more = client.get(detail_url(subscription, "results") + "?offset=20").content.decode()
+    first = html_of(client.get(url("results", subscription)))
+    more = html_of(client.get(url("results", subscription, "?offset=20")))
 
     assert first.count("<article") == 20
-    assert 'id="results"' in first and "offset=20" in first
+    assert "Показати ще 5" in first
     assert more.count("<article") == 5
     assert 'id="results"' not in more and "Показати ще" not in more
 
 
-def test_results_first_page_resets_banner_out_of_band(client, subscription, make_vacancy):
+def test_results_reload_resets_live_state_out_of_band(client, subscription, make_vacancy):
     v = make_vacancy(title="Python")
 
-    html = client.get(detail_url(subscription, "results")).content.decode()
+    html = html_of(client.get(url("results", subscription)))
 
-    assert 'hx-swap-oob="true"' in html
-    assert f"since={v.pk}" in html
+    assert f"?since={v.pk}" in html
+    assert 'id="new-tab"' in html and "Нові ·" not in html
+    assert 'id="match-count" class="count-pill mono" hx-swap-oob="true">1<' in html
 
 
-def test_new_count_banner(client, subscription, make_vacancy):
+def test_preview_shows_unsaved_filters_without_saving(client, subscription, make_vacancy):
+    make_vacancy(title="Django role")
+    make_vacancy(title="Python role")
+
+    html = html_of(
+        client.get(url("preview", query=f"?include_keywords=django&token={subscription.token}"))
+    )
+
+    assert "Django role" in html and "Python role" not in html
+    assert "попередній перегляд" in html
+    subscription.refresh_from_db()
+    assert subscription.include_keywords == ["python"]
+
+
+def test_preview_with_saved_filters_has_no_unsaved_note(client, subscription):
+    query = f"?include_keywords=python&categories=Python&token={subscription.token}"
+    assert "попередній перегляд" not in html_of(client.get(url("preview", query=query)))
+
+
+def test_preview_reports_errors(client):
+    html = html_of(client.get(url("preview", query="?include_keywords=" + "z" * 500)))
+    assert "Перевір фільтри" in html
+
+
+def test_live_counts_new_matches_since_cursor(client, subscription, make_vacancy):
     old = make_vacancy(title="Python old")
-    url = detail_url(subscription, "new_count") + f"?since={old.pk}"
+    live_url = url("live", subscription, f"?since={old.pk}")
 
-    assert "показати" not in client.get(url).content.decode()
+    assert "Нові ·" not in html_of(client.get(live_url))
 
     make_vacancy(title="Python new 1")
     make_vacancy(title="Python new 2")
     make_vacancy(title="Java new")  # does not match
-    html = client.get(url).content.decode()
+    html = html_of(client.get(live_url))
 
-    assert "2 нові вакансії, показати" in html
-    assert f"since={old.pk}" in html  # keeps polling from the same cursor
+    assert "Нові · 2" in html
+    assert f"?since={old.pk}" in html  # keeps the same cursor until the list reloads
 
 
-def test_new_count_ignores_garbage_cursor(client, subscription):
-    assert client.get(detail_url(subscription, "new_count") + "?since=abc").status_code == 200
+def test_live_stamp_uses_last_fetch_time_not_poll_time(client, subscription):
+    Source.objects.filter(category="Python").update(
+        last_fetched_at=timezone.now() - timedelta(minutes=14)
+    )
+    assert "оновлено 14 хв тому" in html_of(client.get(url("live", subscription)))
+
+
+def test_live_stamp_before_any_fetch(client, subscription):
+    assert "ще не оновлювалось" in html_of(client.get(url("live", subscription)))
+
+
+def test_toast_is_off_by_default_and_works_when_enabled(
+    client, subscription, make_vacancy, settings
+):
+    old = make_vacancy(title="Python old")
+    make_vacancy(title="Python brand new")
+    live_url = url("live", subscription, f"?since={old.pk}")
+
+    assert "data-toast" not in html_of(client.get(live_url))
+
+    settings.NEW_VACANCIES_TOAST = True
+    html = html_of(client.get(live_url))
+    assert "data-toast" in html and "1 нова вакансія" in html and "Python brand new" in html
+
+
+def test_live_ignores_garbage_cursor(client, subscription):
+    assert client.get(url("live", subscription, "?since=abc")).status_code == 200
 
 
 def test_feed_partial(client, make_vacancy):
     make_vacancy(title="Anything new")
-    html = client.get(reverse("subscriptions:feed")).content.decode()
+    html = html_of(client.get(url("feed")))
     assert "Anything new" in html and 'id="feed"' in html
 
 
-# --- template helpers ---------------------------------------------------------------
+# --- connect (step 2) ---------------------------------------------------------------------
+
+
+def test_connect_page_has_deep_link_copy_and_qr(client, subscription, settings):
+    html = html_of(client.get(url("connect", subscription)))
+
+    deep_link = f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start={subscription.token}"
+    assert f'href="{deep_link}"' in html
+    assert f'data-copy="{deep_link}"' in html
+    assert "<svg" in html.split('class="qr"', 1)[1]
+    assert url("link_status", subscription) in html
+
+
+def test_connect_without_bot_configured(client, subscription, settings):
+    settings.TELEGRAM_BOT_USERNAME = ""
+    html = html_of(client.get(url("connect", subscription)))
+    assert "?start=" not in html and "не налаштований" in html
+
+
+def test_connect_when_already_linked_redirects(client, linked):
+    response = client.get(url("connect", linked))
+    assert response.status_code == 302 and response["Location"].endswith("#bot")
+
+
+def test_link_status_waits_then_redirects_to_frequency(client, subscription):
+    waiting = client.get(url("link_status", subscription))
+    assert waiting.status_code == 200 and "Чекаємо" in html_of(waiting)
+
+    subscription.chat_id = 7
+    subscription.save()
+    linked = client.get(url("link_status", subscription))
+    assert linked["HX-Redirect"] == url("frequency", subscription)
+
+
+# --- frequency (step 3) & bot settings ------------------------------------------------------
+
+
+def test_frequency_page(client, linked, make_vacancy):
+    Delivery.objects.create(subscription=linked, vacancy=make_vacancy(title="Python"))
+
+    html = html_of(client.get(url("frequency", linked)))
+
+    assert "Як часто надсилати нове?" in html
+    assert "Бот підключено" in html and ">1</span> вакансій" in html
+    for label in (
+        "Щогодини",
+        "Кожні 3 год",
+        "Кожні 6 год",
+        "Кожні 12 год",
+        "Раз на день",
+        "Вимкнено",
+    ):
+        assert label in html
+    assert "Радимо" in html
+
+
+def test_frequency_save_redirects_with_next_slot(client, linked):
+    with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
+        response = client.post(
+            url("frequency", linked),
+            {"frequency": "every_6h", "quiet_hours_start": "23", "quiet_hours_end": "7"},
+        )
+        page = html_of(client.get(response["Location"]))
+
+    linked.refresh_from_db()
+    assert response["Location"].endswith("#bot")
+    assert (linked.frequency, linked.quiet_hours_enabled) == ("every_6h", False)
+    assert (linked.quiet_hours_start, linked.quiet_hours_end) == (23, 7)
+    assert "Наступне сповіщення о 21:00" in page
+
+
+def test_frequency_skip_turns_notifications_off(client, linked):
+    client.post(url("frequency", linked), {"skip": "1"})
+    linked.refresh_from_db()
+    assert linked.frequency == Frequency.OFF
+
+
+def test_frequency_rejects_unknown_values(client, linked):
+    response = client.post(
+        url("frequency", linked),
+        {"frequency": "every_minute", "quiet_hours_start": "22", "quiet_hours_end": "8"},
+    )
+    linked.refresh_from_db()
+    assert response.status_code == 200
+    assert linked.frequency == Frequency.DAILY
+
+
+def test_notifications_card_autosaves(client, linked):
+    with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
+        response = client.post(
+            url("notifications", linked),
+            {
+                "frequency": "hourly",
+                "quiet_hours_enabled": "on",
+                "quiet_hours_start": "22",
+                "quiet_hours_end": "8",
+                "timezone": "Europe/Madrid",
+            },
+        )
+    linked.refresh_from_db()
+    html = html_of(response)
+    assert linked.frequency == "hourly" and linked.timezone == "Europe/Madrid"
+    assert 'id="bot-card"' in html and "Збережено" in html
+    assert "Наступне сповіщення о 16:00" in html and "(Madrid)" in html  # 15:40 in Madrid
+
+
+def test_next_slot_preview_does_not_save(client, linked):
+    with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
+        html = html_of(
+            client.get(
+                url(
+                    "next_slot",
+                    linked,
+                    "?frequency=every_12h&quiet_hours_start=22&quiet_hours_end=8",
+                )
+            )
+        )
+    linked.refresh_from_db()
+    assert "о 21:00" in html
+    assert linked.frequency == Frequency.DAILY
+
+
+def test_unlink(client, linked):
+    response = client.post(url("unlink", linked))
+    linked.refresh_from_db()
+    assert response.status_code == 302
+    assert linked.chat_id is None and linked.linked_at is None
+
+
+# --- template helpers ----------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -229,19 +476,21 @@ def test_uk_plural(n, expected):
     assert uk_plural_form(n, "a", "b", "c") == expected
 
 
-def test_ago():
-    from datetime import timedelta
-
-    from django.utils import timezone
-
+def test_ago_and_ago_short():
     now = timezone.now()
     assert ago(now, now) == "щойно"
     assert ago(now - timedelta(minutes=5), now) == "5 хв тому"
     assert ago(now - timedelta(hours=3), now) == "3 год тому"
     assert ago(now - timedelta(days=1, hours=2), now) == "вчора"
     assert ago(now - timedelta(days=5), now) == "5 днів тому"
+    assert ago_short(now - timedelta(seconds=20), now) == "1 хв"
+    assert ago_short(now - timedelta(hours=2), now) == "2 год"
 
 
-def test_places_drops_remote():
+def test_places_and_where():
     assert places("Київ, віддалено") == "Київ"
-    assert places("віддалено") == ""
+    assert where(SimpleNamespace(location="Київ, Львів, віддалено", is_remote=True)) == (
+        "Київ, Львів · віддалено"
+    )
+    assert where(SimpleNamespace(location="віддалено", is_remote=True)) == "Віддалено"
+    assert where(SimpleNamespace(location="Київ", is_remote=False)) == "Київ"

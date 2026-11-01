@@ -1,0 +1,27 @@
+{% load radar_ui %}{% comment %}
+  "N нових вакансій" pop-up from the design. Built and wired to the live poll
+  (subscriptions/_live.html), but switched off by settings.NEW_VACANCIES_TOAST.
+
+  Params: subscription, count, newest (Vacancy, optional), oob (bool).
+{% endcomment %}<div id="toast-slot"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div class="toast" role="status" aria-live="polite" data-toast>
+    <div class="toast-icon">{% include "components/icons.html" with name="radar" %}</div>
+    <div class="toast-body">
+      <div class="toast-head">
+        <span class="toast-title">{{ count }} {{ count|uk_plural:"нова вакансія,нові вакансії,нових вакансій" }}</span>
+        <span class="toast-time mono">щойно</span>
+      </div>
+      {% if newest %}
+        <div class="toast-text">{{ newest.title }}{% if count > 1 %} і ще {{ count|add:"-1" }}{% endif %}</div>
+      {% endif %}
+      <div class="toast-actions">
+        <button type="button" class="btn btn-primary btn-sm"
+                hx-get="{% url 'subscriptions:results' subscription.token %}"
+                hx-target="#results" hx-swap="outerHTML show:#matches:top"
+                data-toast-close>Показати</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-toast-close>Пізніше</button>
+      </div>
+    </div>
+    <button type="button" class="icon-btn toast-close" aria-label="Закрити сповіщення" data-toast-close>{% include "components/icons.html" with name="close" %}</button>
+  </div>
+</div>

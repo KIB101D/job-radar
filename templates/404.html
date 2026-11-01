@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Сторінку не знайдено | Job Radar{% endblock %}
 {% block content %}
-<div class="notfound">
-  <h1 class="display display-sm">Такої сторінки немає.</h1>
-  <p class="lede">Якщо це посилання на радар, перевір, чи воно скопійоване повністю. Або створи новий за хвилину.</p>
-  <a class="btn btn-primary" href="{% url 'subscriptions:home' %}">Створити радар</a>
-</div>
+<section class="section">
+  <div class="wrap stack-lg notfound">
+    <p class="eyebrow">404</p>
+    <h1 class="display display-md">Такої сторінки немає</h1>
+    <p class="lead">Якщо це посилання на радар, перевір, чи воно скопійоване повністю. Або створи новий за хвилину.</p>
+    <div class="actions"><a class="btn btn-primary btn-lg" href="{% url 'subscriptions:home' %}#filters">Створити радар</a></div>
+  </div>
+</section>
 {% endblock %}

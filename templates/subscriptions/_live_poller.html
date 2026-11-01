@@ -1,0 +1,4 @@
+<div id="live-poll"{% if oob %} hx-swap-oob="true"{% endif %} hidden
+     hx-get="{% url 'subscriptions:live' subscription.token %}?since={{ since_id }}"
+     hx-trigger="every 60s[document.visibilityState === 'visible']"
+     hx-swap="none"></div>

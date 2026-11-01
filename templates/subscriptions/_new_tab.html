@@ -1,0 +1,6 @@
+<div id="new-tab" class="segmented" role="group" aria-label="Відбір збігів"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <span class="segmented-item is-active">Усі</span>
+  <button type="button" class="segmented-item{% if new_count %} has-new{% endif %}"
+          hx-get="{% url 'subscriptions:results' subscription.token %}"
+          hx-target="#results" hx-swap="outerHTML">Нові{% if new_count %} · {{ new_count }}{% endif %}{% if new_count %}<span class="sr-only"> нових вакансій, показати</span>{% endif %}</button>
+</div>

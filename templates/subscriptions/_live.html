@@ -1,0 +1,11 @@
+{% comment %}
+  Response of the 60 s live poll (and of a list reload). Everything here is an
+  out-of-band swap into the radar page:
+  - #live-poll   the poller itself, with the current "since" cursor;
+  - #new-tab     "Нові · N": a click reloads the list and resets the cursor;
+  - #live-stamp  when vacancies were last fetched from DOU (not when we polled);
+  - #toast-slot  pop-up, only when settings.NEW_VACANCIES_TOAST is on.
+{% endcomment %}{% include "subscriptions/_live_poller.html" with oob=True %}
+{% include "subscriptions/_new_tab.html" with oob=True %}
+{% include "subscriptions/_live_stamp.html" with oob=True %}
+{% if toast_enabled and new_count %}{% include "components/toast.html" with count=new_count oob=True %}{% endif %}

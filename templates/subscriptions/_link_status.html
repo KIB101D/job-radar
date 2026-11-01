@@ -1,0 +1,10 @@
+{% comment %}Polled every 3 s on the connect page; the view answers with HX-Redirect once the chat is linked.{% endcomment %}
+<div id="link-status" class="waiting" role="status"
+     hx-get="{% url 'subscriptions:link_status' subscription.token %}"
+     hx-trigger="every 3s[document.visibilityState === 'visible']" hx-swap="outerHTML">
+  <span class="waiting-dot" aria-hidden="true"><span class="waiting-ping"></span><span class="waiting-core"></span></span>
+  <div>
+    <div class="waiting-title">Чекаємо, поки ти натиснеш Start у боті…</div>
+    <div class="field-help">Сторінка оновиться сама, нічого перезавантажувати не треба</div>
+  </div>
+</div>

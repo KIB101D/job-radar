@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Підключи Telegram | Job Radar{% endblock %}
+
+{% block header %}
+<header class="site-header">
+  <div class="wrap wrap-narrow site-header-inner">
+    {% include "components/logo.html" %}
+    {% include "subscriptions/_stepper.html" with step=2 %}
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="wrap wrap-narrow step-page">
+  <div class="step-main stack-lg">
+    <p class="eyebrow eyebrow-blue">Крок 2 із 3</p>
+    <h1 class="display display-md">Підключи Telegram-бота</h1>
+    {% if deep_link %}
+      <p class="lead lead-lg">Натисни кнопку, у Telegram відкриється бот. Тисни <span class="kbd mono">Start</span>, і бот одразу надішле першу пачку вакансій за твоїми фільтрами.</p>
+      <div class="actions">
+        <a class="btn btn-blue btn-lg" href="{{ deep_link }}" target="_blank" rel="noopener">{% include "components/icons.html" with name="telegram" %}Відкрити @{{ bot_username }}</a>
+        <button type="button" class="btn btn-outline btn-lg" data-copy="{{ deep_link }}" data-copied-text="Посилання скопійовано">{% include "components/icons.html" with name="copy" %}<span data-copy-label>Скопіювати посилання</span></button>
+      </div>
+      {% include "subscriptions/_link_status.html" %}
+    {% else %}
+      <p class="lead">Бот ще не налаштований на цьому сервері, тож підключити Telegram поки не вийде. Сайт працює як звичайно.</p>
+    {% endif %}
+    <div class="stack">
+      <p class="field-label">Що станеться після Start</p>
+      <ol class="steps">
+        <li><span class="step-num mono">01</span><span>Бот прив'яже Telegram до твоєї підписки і надішле першу пачку збігів</span></li>
+        <li><span class="step-num mono step-num-lime">02</span><span>Запропонує вибрати частоту автосповіщень. Це перший і головний крок</span></li>
+        <li><span class="step-num mono">03</span><span>Будь-які зміни на сайті чи в боті синхронізуються автоматично</span></li>
+      </ol>
+    </div>
+  </div>
+
+  {% if qr_svg %}
+  <aside class="panel qr-card">
+    <p class="qr-title">Відкрити з телефона</p>
+    <div class="qr" role="img" aria-label="QR-код з посиланням на бота">{{ qr_svg|safe }}</div>
+    <p class="field-help">Скануй камерою, бот відкриється одразу з твоєю підпискою</p>
+    <p class="qr-link mono">{{ deep_link|cut:"https://" }}</p>
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block footer %}
+<footer class="site-footer">
+  <div class="wrap wrap-narrow site-footer-inner">
+    <a class="back-link" href="{% url 'subscriptions:detail' subscription.token %}">{% include "components/icons.html" with name="back" %}Назад до фільтрів</a>
+    <a class="quiet-link" href="{% url 'subscriptions:detail' subscription.token %}">Пізніше, лише сайт</a>
+  </div>
+</footer>
+{% endblock %}

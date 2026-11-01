@@ -1,16 +1,21 @@
-{% load radar_ui %}
-<article class="vac{% if vacancy.pk in seen_ids %} is-seen{% elif vacancy.first_seen_at|is_fresh %} is-fresh{% endif %}">
-  <h3 class="vac-title"><a href="{{ vacancy.url }}" target="_blank" rel="noopener">{{ vacancy.title }}</a></h3>
-  <p class="vac-where">
-    {% if vacancy.company %}<span class="vac-company">{{ vacancy.company }}</span>{% endif %}
-    {% with where=vacancy.location|places %}{% if where %}<span class="vac-place">{{ where }}</span>{% endif %}{% endwith %}
-  </p>
-  <p class="vac-tags">
-    {% if vacancy.is_remote %}<span class="tag tag-remote">віддалено</span>{% endif %}
-    {% if vacancy.salary_text %}<span class="tag tag-salary">{{ vacancy.salary_text }}</span>{% endif %}
-    {% if show_categories %}{% for category in vacancy.categories %}<span class="tag tag-cat">{{ category }}</span>{% endfor %}{% endif %}
-  </p>
-  <p class="vac-time">
-    {% if vacancy.pk in seen_ids %}Надіслано в Telegram{% else %}<time datetime="{{ vacancy.first_seen_at|date:'c' }}">{{ vacancy.first_seen_at|ago }}</time>{% endif %}
-  </p>
+{% load radar_ui %}{% vacancy_tags vacancy filters as tags %}{% card_state vacancy seen_ids fresh_after as state %}
+<article class="card{% if state.new %} is-new{% endif %}{% if state.seen %} is-seen{% endif %}">
+  <div class="card-top">
+    <div class="card-heading">
+      <div class="card-title-row">
+        {% if state.new %}<span class="badge-new">Нова</span>{% endif %}
+        <h4 class="card-title"><a href="{{ vacancy.url }}" target="_blank" rel="noopener">{{ vacancy.title }}</a></h4>
+      </div>
+      {% if vacancy.company %}<div class="card-company">{{ vacancy.company }}</div>{% endif %}
+    </div>
+    <span class="card-time mono">{% if state.seen %}у Telegram{% else %}{{ vacancy.first_seen_at|ago }}{% endif %}</span>
+  </div>
+  <div class="card-meta">
+    {% with place=vacancy|where %}{% if place %}<span class="card-place">{% include "components/icons.html" with name="pin" %}{{ place }}</span>{% endif %}{% endwith %}
+    <span class="card-salary mono">{{ vacancy.salary_text|default:"Не вказано" }}</span>
+  </div>
+  <div class="card-foot">
+    <div class="card-tags">{% for tag in tags %}<span class="tag mono">{{ tag }}</span>{% endfor %}</div>
+    <a class="card-link" href="{{ vacancy.url }}" target="_blank" rel="noopener">Відкрити на DOU{% include "components/icons.html" with name="external" %}<span class="sr-only"> (нова вкладка)</span></a>
+  </div>
 </article>

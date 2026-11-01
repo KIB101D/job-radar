@@ -1,4 +1,15 @@
-{% load radar_ui %}{% if not append %}<section id="results" class="results" aria-live="polite">
+{% load radar_ui %}{% comment %}
+  Matches list. Modes:
+  - full list (default): #results wrapper, used on page load, preview and reload;
+  - append: only the next cards + "Показати ще", for pagination.
+  Out-of-band swaps keep the header count and the live poller in sync.
+{% endcomment %}{% if errors %}
+<section id="results" class="results">
+  <div class="empty"><p class="empty-title">Перевір фільтри.</p>{% for field, list in errors.items %}<p>{{ list|join:" " }}</p>{% endfor %}</div>
+</section>
+{% else %}
+{% if not append %}<section id="results" class="results" aria-live="polite">
+  {% if unsaved %}<p class="unsaved-note">Це попередній перегляд. Натисни «Зберегти фільтри», щоб радар і бот шукали саме так.</p>{% endif %}
 {% endif %}
   {% for vacancy in page.vacancies %}
     {% include "subscriptions/_vacancy.html" %}
@@ -6,16 +17,18 @@
     {% if not append %}
       <div class="empty">
         <p class="empty-title">Поки нічого не знайдено.</p>
-        <p>Спробуй прибрати частину слів, зняти «Тільки віддалено» або додати категорію. Нові вакансії перевіряємо кожні 30 хвилин, тож цей список ще поповниться.</p>
+        <p>Прибери частину слів, зніми «Тільки віддалено» або додай категорію. Нові вакансії підтягуємо кожні 30 хвилин, тож список ще поповниться.</p>
       </div>
     {% endif %}
   {% endfor %}
-  {% if page.has_more %}
-    <button class="btn btn-quiet more"
+  {% if page.has_more and subscription and not preview %}
+    <button type="button" class="btn btn-outline btn-block more"
             hx-get="{% url 'subscriptions:results' subscription.token %}?offset={{ page.next_offset }}"
-            hx-target="this" hx-swap="outerHTML">Показати ще</button>
+            hx-target="this" hx-swap="outerHTML">Показати ще {{ remaining }}</button>
+  {% elif page.has_more and not subscription %}
+    <p class="results-more-note">Ще {{ remaining }} {{ remaining|uk_plural:"вакансія,вакансії,вакансій" }} за цими фільтрами. Створи радар, щоб бачити всі збіги і нові наживо.</p>
   {% endif %}
 {% if not append %}</section>{% endif %}
-{% if since_id is not None %}
-  {% include "subscriptions/_banner.html" with count=0 oob=True %}
+{% if fragment and not append %}<span id="match-count" class="count-pill mono" hx-swap-oob="true">{{ page.total }}</span>{% endif %}
+{% if since_id is not None and subscription %}{% include "subscriptions/_live.html" with oob=True %}{% endif %}
 {% endif %}

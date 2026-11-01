@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Частота сповіщень | Job Radar{% endblock %}
+
+{% block header %}
+<header class="site-header">
+  <div class="wrap wrap-narrow site-header-inner">
+    {% include "components/logo.html" %}
+    {% include "subscriptions/_stepper.html" with step=3 %}
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="wrap wrap-narrow step-page step-page-col">
+  {% if subscription.is_linked %}
+  <div class="success" role="status">
+    <span class="success-icon">{% include "components/icons.html" with name="check" %}</span>
+    <div>
+      <div class="success-title">Бот підключено</div>
+      <div class="success-text">{% if first_batch %}Перша пачка вже в Telegram: <span class="mono">{{ first_batch }}</span> вакансій за твоїми фільтрами{% else %}Нових збігів поки немає. Надішлемо, щойно з'являться{% endif %}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% with form=notifications_form %}
+  <form method="post" class="stack-lg freq-form" aria-labelledby="freq-title"
+        hx-get="{% url 'subscriptions:next_slot' subscription.token %}"
+        hx-trigger="change" hx-target="#next-slot" hx-swap="outerHTML">
+    {% csrf_token %}
+    {{ form.timezone }}
+    <div>
+      <h1 id="freq-title" class="display display-md">Як часто надсилати нове?</h1>
+      <p class="lead">У цьому вся суть радару: він працює сам і приходить до тебе тоді, коли зручно. Змінити можна будь-коли на сайті або в боті.</p>
+    </div>
+
+    {% for error in form.non_field_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    <fieldset class="field">
+      <legend class="sr-only">Частота автосповіщень</legend>
+      <div class="freq-grid">
+        {% for option in form.frequency_options %}
+          <label class="freq-card{% if option.checked %} is-checked{% endif %}">
+            <span class="freq-card-top">
+              <span class="freq-card-name">
+                <input type="radio" name="frequency" value="{{ option.value }}"{% if option.checked %} checked{% endif %}>
+                <span>{{ option.label }}</span>
+              </span>
+              {% if option.recommended %}<span class="pill-lime">Радимо</span>{% endif %}
+            </span>
+            <span class="freq-card-hint">{{ option.hint }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% include "subscriptions/_next_slot.html" %}
+    </fieldset>
+
+    <div class="panel quiet-row">
+      <label class="switch">
+        <input type="checkbox" role="switch" name="quiet_hours_enabled" aria-labelledby="quiet-label"{% if form.instance.quiet_hours_enabled %} checked{% endif %}>
+        <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+      </label>
+      <div class="quiet-text">
+        <div id="quiet-label" class="setting-title">Тихі години</div>
+        <div class="field-help">Вночі бот мовчить, а все нове приходить одним повідомленням зранку</div>
+      </div>
+      <div class="quiet-range">
+        <label for="q-from" class="field-help">з</label>
+        <select id="q-from" name="quiet_hours_start" class="select mono">{% for value, label in form.fields.quiet_hours_start.choices %}<option value="{{ value }}"{% if value == form.instance.quiet_hours_start %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <label for="q-to" class="field-help">до</label>
+        <select id="q-to" name="quiet_hours_end" class="select mono">{% for value, label in form.fields.quiet_hours_end.choices %}<option value="{{ value }}"{% if value == form.instance.quiet_hours_end %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn btn-primary btn-lg">Зберегти і перейти до збігів</button>
+      <button type="submit" name="skip" value="1" class="link-btn">Пропустити, лише вручну</button>
+    </div>
+  </form>
+  {% endwith %}
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}

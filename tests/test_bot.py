@@ -354,6 +354,27 @@ def test_choosing_frequency_updates_subscription_and_message(send, linked):
     assert tg.sent("answerCallbackQuery")[-1]["text"] == texts.FREQUENCY_SAVED
 
 
+def test_stale_site_tab_does_not_overwrite_bot_changes(client, send, linked):
+    """Site tab opened with 'every 3 h'; the bot then switched to hourly; the old tab
+    now turns quiet hours off. Only quiet hours may change."""
+    send(callback_update("freq:hourly"))
+
+    client.post(
+        reverse("subscriptions:notifications", args=[linked.token]),
+        {
+            "changed": "quiet_hours_enabled",
+            "frequency": "every_3h",  # stale value still shown in the old tab
+            "quiet_hours_start": "22",
+            "quiet_hours_end": "8",
+            # quiet_hours_enabled unchecked -> not sent
+        },
+    )
+
+    linked.refresh_from_db()
+    assert linked.frequency == Frequency.HOURLY
+    assert linked.quiet_hours_enabled is False
+
+
 def test_frequency_choice_shows_on_site(client, send, linked):
     send(callback_update("freq:hourly"))
     page = client.get(reverse("subscriptions:radar_bot", args=[linked.token])).content.decode()
@@ -366,8 +387,11 @@ def test_pressing_selected_frequency_again_is_fine(send, linked, tg):
     assert tg.sent("answerCallbackQuery")
 
 
-def test_quiet_hours_toggle(send, linked):
-    tg = send(callback_update("quiet:toggle"))
+def test_quiet_hours_button_switches_to_what_it_says(send, linked):
+    payload = send(message_update(texts.BTN_FREQUENCY)).sent()[-1]
+    assert payload["reply_markup"]["inline_keyboard"][-1][0]["callback_data"] == "quiet:off"
+
+    tg = send(callback_update("quiet:off"))
     linked.refresh_from_db()
     assert linked.quiet_hours_enabled is False
     assert texts.QUIET_OFF in tg.sent("editMessageText")[-1]["text"]
@@ -388,6 +412,36 @@ def test_garbage_callback(send, linked):
 def test_callback_from_unlinked_chat(send):
     tg = send(callback_update("freq:daily", chat_id=999))
     assert tg.sent("answerCallbackQuery")[-1]["text"] == texts.CALLBACK_EXPIRED
+
+
+def test_old_quiet_button_does_not_flip_back_a_change_made_on_the_site(send, linked):
+    """The message said 'увімкнено' (button = turn off); the site already turned them off."""
+    linked.quiet_hours_enabled = False
+    linked.save()
+
+    send(callback_update("quiet:off"))
+
+    linked.refresh_from_db()
+    assert linked.quiet_hours_enabled is False  # a toggle would have turned them back on
+
+
+def test_old_pause_button_does_not_resume(send, linked):
+    linked.paused = True
+    linked.save()
+
+    send(message_update(texts.BTN_PAUSE))  # an outdated keyboard still shows "Пауза"
+
+    linked.refresh_from_db()
+    assert linked.paused is True
+
+
+def test_pause_command_toggles(send, linked):
+    send(message_update("/pause"))
+    linked.refresh_from_db()
+    assert linked.paused is True
+    send(message_update("/pause"))
+    linked.refresh_from_db()
+    assert linked.paused is False
 
 
 def test_pause_and_resume_swap_the_menu_button(send, linked):

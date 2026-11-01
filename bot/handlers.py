@@ -219,8 +219,8 @@ def frequency_text(subscription: Subscription) -> str:
     return "\n".join(lines)
 
 
-def toggle_pause(subscription: Subscription) -> None:
-    subscription.paused = not subscription.paused
+def set_paused(subscription: Subscription, paused: bool) -> None:
+    subscription.paused = paused
     subscription.save(update_fields=["paused", "updated_at"])
     if subscription.paused:
         text = texts.PAUSED
@@ -260,9 +260,10 @@ ACTIONS = {
     texts.BTN_LATEST: do_latest,
     "/frequency": send_frequency,
     texts.BTN_FREQUENCY: send_frequency,
-    "/pause": toggle_pause,
-    texts.BTN_PAUSE: toggle_pause,
-    texts.BTN_RESUME: toggle_pause,
+    # Menu buttons are explicit, so an outdated keyboard can't do the opposite.
+    "/pause": lambda sub: set_paused(sub, not sub.paused),
+    texts.BTN_PAUSE: lambda sub: set_paused(sub, True),
+    texts.BTN_RESUME: lambda sub: set_paused(sub, False),
     "/filters": send_filters_link,
     texts.BTN_FILTERS: send_filters_link,
     "/stop": stop,
@@ -290,8 +291,8 @@ def handle_callback(callback: dict) -> None:
         subscription.save(update_fields=["frequency", "updated_at"])
         refresh_frequency_message(subscription, message)
         answer = texts.FREQUENCY_SAVED
-    elif kind == "quiet":
-        subscription.quiet_hours_enabled = not subscription.quiet_hours_enabled
+    elif kind == "quiet" and value in ("on", "off"):
+        subscription.quiet_hours_enabled = value == "on"
         subscription.save(update_fields=["quiet_hours_enabled", "updated_at"])
         refresh_frequency_message(subscription, message)
         answer = texts.FREQUENCY_SAVED

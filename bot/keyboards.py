@@ -32,8 +32,13 @@ def frequency_keyboard(subscription) -> dict:
         for value, label in Frequency.choices
     ]
     rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
-    quiet = texts.QUIET_BUTTON_ON if subscription.quiet_hours_enabled else texts.QUIET_BUTTON_OFF
-    rows.append([{"text": quiet, "callback_data": "quiet:toggle"}])
+    # The button carries the state it switches TO, not "toggle": pressing it in
+    # an old message (after the site changed quiet hours) still does what it says.
+    if subscription.quiet_hours_enabled:
+        quiet = {"text": texts.QUIET_BUTTON_ON, "callback_data": "quiet:off"}
+    else:
+        quiet = {"text": texts.QUIET_BUTTON_OFF, "callback_data": "quiet:on"}
+    rows.append([quiet])
     return {"inline_keyboard": rows}
 
 

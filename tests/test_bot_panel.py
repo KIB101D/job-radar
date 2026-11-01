@@ -283,14 +283,91 @@ def test_unknown_category_is_ignored(send, sub, panel):
     assert sub.categories == ["Python"]
 
 
-def test_remote_only_switch(send, sub, panel):
-    tg = send(tap("remote:on", panel))
-    sub.refresh_from_db()
-    assert sub.remote_only is True
-    assert texts.BTN_REMOTE_ON in labels(last_edit(tg))
+def test_old_panels_remote_button_still_works(send, sub, panel):
+    send(tap("remote:on", panel))
     send(tap("remote:on", panel))  # an old panel pressed again: stays on
     sub.refresh_from_db()
     assert sub.remote_only is True
+
+
+# --- level, city, salary ----------------------------------------------------------------------
+
+
+def test_filters_screen_shows_and_opens_the_new_filters(send, sub, panel):
+    Subscription.objects.filter(pk=sub.pk).update(
+        levels=["junior", "middle"], cities=["Львів"], remote_only=True, salary_min=1000
+    )
+    tg = send(tap("nav:filters", panel))
+    text = last_edit(tg)["text"]
+    assert "📶 Рівень: Junior, Middle" in text
+    assert "📍 Місто: віддалено, Львів" in text
+    assert "💵 Зарплата: від $1000 і без зарплати" in text
+    data = {b["callback_data"] for b in buttons(last_edit(tg)) if "callback_data" in b}
+    assert {"nav:levels", "nav:places", "nav:salary"} <= data
+
+
+def test_levels_screen(send, sub, panel):
+    tg = send(tap("nav:levels", panel))
+    by_text = {b["text"]: b["callback_data"] for b in buttons(last_edit(tg))}
+    assert by_text["Junior"] == "lvl+:junior"
+
+    send(tap("lvl+:middle", panel))
+    send(tap("lvl+:junior", panel))
+    send(tap("lvl+:junior", panel))  # absolute: still on
+    sub.refresh_from_db()
+    assert sub.levels == ["junior", "middle"]  # in level order
+    assert "✅ Junior" in labels(last_edit(tg))
+
+    send(tap("lvl+:guru", panel))  # unknown level: ignored
+    send(tap("lvlall", panel))
+    sub.refresh_from_db()
+    assert sub.levels == []
+
+
+def test_places_screen_has_remote_and_real_cities(send, sub, panel, make_vacancy):
+    make_vacancy(title="A", location="Київ, Львів")
+    make_vacancy(title="B", location="Львів, віддалено", is_remote=True)
+
+    tg = send(tap("nav:places", panel))
+    by_text = {b["text"]: b["callback_data"] for b in buttons(last_edit(tg))}
+    assert by_text["🏠 Віддалено"] == "rem:on"
+    assert by_text["Львів"] == "plc+:Львів" and by_text["Київ"] == "plc+:Київ"
+    assert list(by_text).index("Львів") < list(by_text).index("Київ")  # most common first
+
+    send(tap("rem:on", panel))
+    send(tap("plc+:Львів", panel))
+    sub.refresh_from_db()
+    assert sub.remote_only is True and sub.cities == ["Львів"]
+    assert {"✅ 🏠 Віддалено", "✅ Львів"} <= set(labels(last_edit(tg)))
+
+    send(tap("plc-:Львів", panel))
+    send(tap("plcall", panel))
+    sub.refresh_from_db()
+    assert sub.cities == [] and sub.remote_only is False
+
+
+def test_salary_screen_presets_and_unknown_switch(send, sub, panel):
+    tg = send(tap("nav:salary", panel))
+    assert "✅ Будь-яка" in labels(last_edit(tg))
+
+    send(tap("sal:2000", panel))
+    send(tap("sunk:off", panel))
+    sub.refresh_from_db()
+    assert sub.salary_min == 2000 and sub.salary_unknown is False
+    edit = last_edit(tg)
+    assert "✅ від $2000" in labels(edit) and texts.BTN_UNKNOWN_OFF in labels(edit)
+
+    send(tap("sal:abc", panel))  # garbage: ignored, nothing changes
+    sub.refresh_from_db()
+    assert sub.salary_min == 2000
+
+
+def test_new_filters_apply_to_bot_matches(send, sub, panel, make_vacancy):
+    make_vacancy(title="Junior Python Developer", salary_text="$800–1200")
+    make_vacancy(title="Senior Python Developer", salary_text="$5000")
+    send(tap("lvl+:junior", panel))
+    tg = send(tap("sal:1000", panel))
+    assert "📊 Зараз збігів: <b>1</b>" in last_edit(tg)["text"]
 
 
 def test_filters_changed_in_bot_are_used_by_the_site_and_the_bot(

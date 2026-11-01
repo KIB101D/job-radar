@@ -5,6 +5,7 @@ from html import escape
 from django.conf import settings
 from django.urls import reverse
 
+from radar.attributes import LEVEL_LABELS, LEVELS
 from radar.matching import Filters
 
 from . import texts
@@ -61,8 +62,26 @@ def vacancy_list(
     return "\n\n".join(parts), shown
 
 
+def levels_text(levels) -> str:
+    """'Junior, Middle' in the usual order, '' for any."""
+    return ", ".join(LEVEL_LABELS[level] for level in LEVELS if level in levels)
+
+
+def places_text(remote: bool, cities) -> str:
+    """'віддалено, Київ, Львів', '' for anywhere."""
+    return ", ".join([texts.REMOTE] * remote + sorted(cities))
+
+
+def salary_label(minimum: int, unknown: bool) -> str:
+    """'від $1000' or 'від $1000 і без зарплати', '' for any."""
+    if not minimum:
+        return ""
+    salary = texts.SALARY_FROM.format(amount=minimum)
+    return texts.SALARY_AND_UNKNOWN.format(salary=salary) if unknown else salary
+
+
 def filters_summary(filters: Filters) -> str:
-    """'python, django · без: senior · Python · тільки віддалено'."""
+    """'python, django · без: senior · Python · Junior · віддалено, Київ · від $1000'."""
     parts = []
     if filters.include:
         parts.append(", ".join(filters.include))
@@ -70,6 +89,12 @@ def filters_summary(filters: Filters) -> str:
         parts.append(texts.FILTERS_EXCLUDE.format(words=", ".join(filters.exclude)))
     if filters.categories:
         parts.append(", ".join(sorted(filters.categories)))
-    if filters.remote_only:
+    if filters.levels:
+        parts.append(levels_text(filters.levels))
+    if filters.remote_only and not filters.cities:
         parts.append(texts.FILTERS_REMOTE)
+    elif filters.cities:
+        parts.append(places_text(filters.remote_only, filters.cities))
+    if filters.salary_min:
+        parts.append(texts.SALARY_FROM.format(amount=filters.salary_min))
     return escape(" · ".join(parts)) if parts else texts.FILTERS_ALL

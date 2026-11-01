@@ -6,7 +6,10 @@ directly, without a summary screen in between:
 
     🔎 Фільтри    filters ──┬── words     (include keywords)
                            ├── exclude   (exclude keywords)
-                           └── cats      (DOU categories)
+                           ├── cats      (DOU categories)
+                           ├── levels    (Intern ... Lead)
+                           ├── places    (remote + cities)
+                           └── salary    (minimum + vacancies without one)
     ⏰ Сповіщення  freq                    (frequency + quiet hours)
 
 Opening the panel again (menu button, /filters, /frequency) deletes
@@ -14,7 +17,7 @@ the old panel and sends a fresh one at the bottom of the chat, so there's only
 ever one. Lists of vacancies, pause and digests stay separate messages: those
 are events worth keeping in the history.
 
-Every button sets an absolute value (cat+/cat-, remote:on/off, quiet:on/off) and
+Every button sets an absolute value (cat+/cat-, rem:on/off, sal:1000, quiet:on/off) and
 word removal checks a fingerprint of the word, so pressing a button in a panel
 that's out of date can never undo a change made on the site.
 """
@@ -22,19 +25,22 @@ that's out of date can never undo a change made on the site.
 import zlib
 from html import escape
 
+from radar.attributes import LEVEL_LABELS, LEVELS
 from radar.matching import MAX_KEYWORD_LENGTH, MAX_KEYWORDS, parse_keywords
 from radar.search import search
 from subscriptions import schedule
 from subscriptions.delivery import filters_for
-from subscriptions.forms import FILTER_FIELDS, category_choices
+from subscriptions.forms import FILTER_FIELDS, MAX_CITIES, category_choices, city_choices
 from subscriptions.models import Frequency, Subscription
 
 from . import texts
-from .formatting import is_public_url, radar_url
+from .formatting import is_public_url, levels_text, places_text, radar_url, salary_label
 from .models import ChatState
 from .telegram import TelegramError, get_client
 
-SCREENS = ("filters", "words", "exclude", "cats", "freq")
+SCREENS = ("filters", "words", "exclude", "cats", "levels", "places", "salary", "freq")
+SALARY_PRESETS = (500, 1000, 2000, 3000)
+CALLBACK_LIMIT = 64  # bytes of callback_data Telegram accepts
 # The summary screen was removed; buttons in older panels still say "nav:main".
 SCREEN_ALIASES = {"main": "filters"}
 WORD_LISTS = {"words": "include_keywords", "exclude": "exclude_keywords"}
@@ -81,6 +87,9 @@ def render(subscription: Subscription, screen: str, note: str = "") -> tuple[str
         "words": _words,
         "exclude": _words,
         "cats": _categories,
+        "levels": _levels,
+        "places": _places,
+        "salary": _salary,
         "freq": _frequency,
     }.get(screen, _filters)
     text, rows = builder(subscription, screen)
@@ -99,7 +108,15 @@ def _filter_lines(subscription: Subscription) -> list[str]:
         texts.LINE_CATEGORIES.format(
             value=join(sorted(subscription.categories), texts.ALL_CATEGORIES)
         ),
-        texts.LINE_REMOTE.format(value=texts.YES if subscription.remote_only else texts.NO),
+        texts.LINE_LEVELS.format(value=levels_text(subscription.levels) or texts.ANY_LEVEL),
+        texts.LINE_PLACES.format(
+            value=escape(places_text(subscription.remote_only, subscription.cities))
+            or texts.ANY_PLACE
+        ),
+        texts.LINE_SALARY.format(
+            value=salary_label(subscription.salary_min, subscription.salary_unknown)
+            or texts.ANY_SALARY
+        ),
     ]
 
 
@@ -112,17 +129,19 @@ def _filters(subscription: Subscription, screen: str):
             texts.MATCHES.format(count=match_count(subscription)),
         ]
     )
-    remote = (
-        {"text": texts.BTN_REMOTE_ON, "callback_data": "remote:off"}
-        if subscription.remote_only
-        else {"text": texts.BTN_REMOTE_OFF, "callback_data": "remote:on"}
-    )
     rows = [
         [
             {"text": texts.BTN_WORDS, "callback_data": "nav:words"},
             {"text": texts.BTN_EXCLUDE, "callback_data": "nav:exclude"},
         ],
-        [{"text": texts.BTN_CATEGORIES, "callback_data": "nav:cats"}, remote],
+        [
+            {"text": texts.BTN_CATEGORIES, "callback_data": "nav:cats"},
+            {"text": texts.BTN_LEVELS, "callback_data": "nav:levels"},
+        ],
+        [
+            {"text": texts.BTN_PLACES, "callback_data": "nav:places"},
+            {"text": texts.BTN_SALARY, "callback_data": "nav:salary"},
+        ],
     ]
     url = radar_url(subscription)
     if is_public_url(url):  # Telegram won't accept a localhost button in development
@@ -184,6 +203,61 @@ def _categories(subscription: Subscription, screen: str):
         rows.append([{"text": texts.BTN_ALL_CATEGORIES, "callback_data": "catall"}])
     rows.append([{"text": texts.BTN_BACK_FILTERS, "callback_data": "nav:filters"}])
     return text, rows
+
+
+def _check(on: bool, label: str, data: str) -> dict:
+    return {"text": (texts.SELECTED if on else "") + label, "callback_data": data}
+
+
+def _screen(title: str, help_text: str, subscription: Subscription) -> str:
+    return "\n".join([title, help_text, "", texts.MATCHES.format(count=match_count(subscription))])
+
+
+def _levels(subscription: Subscription, screen: str):
+    chosen = set(subscription.levels)
+    buttons = [
+        _check(
+            level in chosen, LEVEL_LABELS[level], f"lvl{'-' if level in chosen else '+'}:{level}"
+        )
+        for level in LEVELS
+    ]
+    rows = [buttons[:3], buttons[3:]]
+    if chosen:
+        rows.append([{"text": texts.BTN_ANY_LEVEL, "callback_data": "lvlall"}])
+    rows.append([{"text": texts.BTN_BACK_FILTERS, "callback_data": "nav:filters"}])
+    return _screen(texts.LEVELS_TITLE, texts.LEVELS_HELP, subscription), rows
+
+
+def _places(subscription: Subscription, screen: str):
+    remote = subscription.remote_only
+    chosen = set(subscription.cities)
+    rows = [[_check(remote, texts.BTN_REMOTE_CHIP, f"rem:{'off' if remote else 'on'}")]]
+    buttons = []
+    for city, _ in city_choices(subscription.cities):
+        data = f"plc{'-' if city in chosen else '+'}:{city}"
+        if len(data.encode()) <= CALLBACK_LIMIT:
+            buttons.append(_check(city in chosen, city, data))
+    rows += [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
+    if remote or chosen:
+        rows.append([{"text": texts.BTN_ANY_PLACE, "callback_data": "plcall"}])
+    rows.append([{"text": texts.BTN_BACK_FILTERS, "callback_data": "nav:filters"}])
+    return _screen(texts.PLACES_TITLE, texts.PLACES_HELP, subscription), rows
+
+
+def _salary(subscription: Subscription, screen: str):
+    current = subscription.salary_min
+    presets = [_check(not current, texts.BTN_ANY_SALARY, "sal:0")] + [
+        _check(current == amount, texts.BTN_SALARY_FROM.format(amount=amount), f"sal:{amount}")
+        for amount in SALARY_PRESETS
+    ]
+    unknown = (
+        {"text": texts.BTN_UNKNOWN_ON, "callback_data": "sunk:off"}
+        if subscription.salary_unknown
+        else {"text": texts.BTN_UNKNOWN_OFF, "callback_data": "sunk:on"}
+    )
+    rows = [presets[:3], presets[3:], [unknown]]
+    rows.append([{"text": texts.BTN_BACK_FILTERS, "callback_data": "nav:filters"}])
+    return _screen(texts.SALARY_TITLE, texts.SALARY_HELP, subscription), rows
 
 
 def frequency_text(subscription: Subscription) -> str:
@@ -365,6 +439,33 @@ def set_remote(subscription: Subscription, on: bool) -> None:
     _save_filters(subscription)
 
 
+def set_level(subscription: Subscription, level: str, on: bool) -> None:
+    if level not in LEVELS:
+        return
+    chosen = set(subscription.levels)
+    chosen.add(level) if on else chosen.discard(level)
+    subscription.levels = [lv for lv in LEVELS if lv in chosen]
+    _save_filters(subscription)
+
+
+def set_city(subscription: Subscription, city: str, on: bool) -> None:
+    if not 0 < len(city) <= 60:
+        return
+    cities = [c for c in subscription.cities if c != city]
+    if on and len(cities) < MAX_CITIES:
+        cities.append(city)
+    subscription.cities = cities
+    _save_filters(subscription)
+
+
+def set_salary(subscription: Subscription, *, minimum=None, unknown=None) -> None:
+    if minimum is not None:
+        subscription.salary_min = minimum
+    if unknown is not None:
+        subscription.salary_unknown = unknown
+    _save_filters(subscription)
+
+
 # --- input ----------------------------------------------------------------------------------------
 
 
@@ -388,9 +489,35 @@ def handle_callback(subscription: Subscription, data: str, message_id: int) -> s
         subscription.quiet_hours_enabled = value == "on"
         subscription.save(update_fields=["quiet_hours_enabled", "updated_at"])
         screen = "freq"
-    elif kind == "remote" and value in ("on", "off"):
+    elif kind == "remote" and value in (
+        "on",
+        "off",
+    ):  # "Віддалено" on the filters screen of old panels
         set_remote(subscription, value == "on")
         screen = "filters"
+    elif kind == "rem" and value in ("on", "off"):
+        set_remote(subscription, value == "on")
+        screen = "places"
+    elif kind in ("plc+", "plc-") and value:
+        set_city(subscription, value, on=kind == "plc+")
+        screen = "places"
+    elif kind == "plcall":
+        subscription.cities, subscription.remote_only = [], False
+        _save_filters(subscription)
+        screen = "places"
+    elif kind in ("lvl+", "lvl-") and value:
+        set_level(subscription, value, on=kind == "lvl+")
+        screen = "levels"
+    elif kind == "lvlall":
+        subscription.levels = []
+        _save_filters(subscription)
+        screen = "levels"
+    elif kind == "sal" and value.isdigit() and int(value) <= 100_000:
+        set_salary(subscription, minimum=int(value))
+        screen = "salary"
+    elif kind == "sunk" and value in ("on", "off"):
+        set_salary(subscription, unknown=value == "on")
+        screen = "salary"
     elif kind in ("cat+", "cat-") and value:
         set_category(subscription, value, on=kind == "cat+")
         screen = "cats"

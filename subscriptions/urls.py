@@ -9,13 +9,16 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("filters/", views.filters_new, name="filters"),
     path("bot/", views.bot, name="bot"),
+    path("data/", views.data, name="data"),
     path("s/<str:token>/", views.detail, name="detail"),
     path("s/<str:token>/bot/", views.radar_bot, name="radar_bot"),
     path("s/<str:token>/connect/", views.connect, name="connect"),
     path("s/<str:token>/frequency/", views.frequency, name="frequency"),
+    path("s/<str:token>/data/", views.radar_data, name="radar_data"),
     # Actions
     path("s/<str:token>/notifications/", views.notifications, name="notifications"),
     path("s/<str:token>/unlink/", views.unlink, name="unlink"),
+    path("s/<str:token>/delete/", views.delete, name="delete"),
     # HTMX fragments
     path("preview/", views.preview, name="preview"),
     path("feed/", views.feed, name="feed"),

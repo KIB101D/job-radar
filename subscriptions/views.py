@@ -9,6 +9,7 @@ Pages (the top navigation: Головна, Фільтри, Telegram-бот):
 - /s/<token>/bot/         Telegram-бот of a radar: connect, or frequency and quiet hours
 - /s/<token>/connect/     step 2: open the bot (deep link, QR)
 - /s/<token>/frequency/   step 3: how often to notify
+- /data/, /s/<token>/data/  what we store and why; a radar's page can delete it
 /filters/ and /bot/ redirect to the radar remembered in the cookie, if any.
 
 HTMX fragments:
@@ -599,6 +600,43 @@ def unlink(request, token: str):
         notify_unlinked(chat_id)
     messages.success(request, "Telegram відключено. Фільтри на сайті лишились як були.")
     return redirect("subscriptions:radar_bot", token)
+
+
+@require_GET
+def data(request):
+    """What we store, for someone without a radar (or the one from the cookie)."""
+    if existing := _cookie_radar(request):
+        return redirect("subscriptions:radar_data", existing.token)
+    return render(request, "subscriptions/data.html", {})
+
+
+@require_GET
+def radar_data(request, token: str):
+    subscription = get_object_or_404(Subscription, token=token)
+    return render(request, "subscriptions/data.html", {"subscription": subscription})
+
+
+@require_POST
+def delete(request, token: str):
+    """
+    Delete the radar with everything tied to it (deliveries cascade). A linked
+    chat is told, loses its menu and panel, and its bot state is forgotten.
+    """
+    subscription = get_object_or_404(Subscription, token=token)
+    if request.POST.get("confirm") != "yes":
+        messages.error(request, "Постав позначку, що розумієш: видалення назавжди.")
+        return redirect("subscriptions:radar_data", token)
+    chat_id = subscription.chat_id
+    subscription.delete()
+    if chat_id:
+        from bot.sync import notify_deleted  # bot depends on this app, not vice versa
+
+        notify_deleted(chat_id)
+    messages.success(request, "Радар видалено разом з усіма його даними.")
+    response = redirect("subscriptions:home")
+    if request.COOKIES.get(TOKEN_COOKIE) == token:
+        response.delete_cookie(TOKEN_COOKIE, samesite="Lax")
+    return response
 
 
 # --- HTMX fragments -------------------------------------------------------------------

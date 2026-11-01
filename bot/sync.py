@@ -19,6 +19,21 @@ def refresh_settings_message(subscription: Subscription) -> bool:
     return refresh_panel(subscription)
 
 
+def notify_deleted(chat_id: int) -> None:
+    """
+    The radar was deleted on the website: say so in Telegram, remove panel and
+    menu, and forget the chat's bot state too (nothing about the chat is kept).
+    """
+    from django.conf import settings
+
+    from . import texts
+    from .models import ChatState
+
+    if settings.TELEGRAM_BOT_TOKEN:
+        say_unlinked(chat_id, texts.RADAR_DELETED)
+    ChatState.objects.filter(chat_id=chat_id).delete()
+
+
 def notify_unlinked(chat_id: int) -> None:
     """The chat was unlinked on the website: say so in Telegram, remove panel and menu."""
     from django.conf import settings

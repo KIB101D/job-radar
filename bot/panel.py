@@ -363,14 +363,15 @@ def forget_panel(chat_id: int) -> None:
         state.save()
 
 
-def say_unlinked(chat_id: int) -> None:
+def say_unlinked(chat_id: int, text: str = texts.UNLINKED_ON_SITE) -> None:
     """
-    Unlinked on the website: tell the chat, take away the panel and the menu, so
-    Telegram doesn't keep looking connected. Best effort: never raises.
+    Unlinked (or the radar deleted) on the website: tell the chat, take away the
+    panel and the menu, so Telegram doesn't keep looking connected. Best effort:
+    never raises.
     """
     forget_panel(chat_id)
     try:
-        get_client().send_message(chat_id, texts.UNLINKED_ON_SITE, {"remove_keyboard": True})
+        get_client().send_message(chat_id, text, {"remove_keyboard": True})
     except TelegramError:
         pass  # the user blocked the bot, Telegram is down...: the unlink itself stands
 

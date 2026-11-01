@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% comment %}
+  "Дані": one paragraph on what we store, why and how to delete it. Opened from a
+  radar (subscription), it also offers deleting that radar for good.
+{% endcomment %}
+{% block title %}Дані | Job Radar{% endblock %}
+
+{% block content %}
+<section class="section section-first section-page" aria-labelledby="data-title">
+  <div class="wrap"><div class="data-page stack-lg">
+    <div class="section-head">
+      <p class="eyebrow">Дані</p>
+      <h1 id="data-title" class="h2">Що ми зберігаємо</h1>
+    </div>
+    <p class="data-text">Акаунтів тут немає, тож ми не знаємо твого імені чи пошти. Зберігаємо лише те, без чого радар не працює: фільтри і часовий пояс для розкладу сповіщень, а якщо підключено бота, то ще номер Telegram-чату і список уже надісланих вакансій, щоб не слати їх двічі. Повідомлень із чату ми не зберігаємо. Доступ до радару дає тільки його посилання, тож не ділись ним. Відключити бота можна на сторінці «Telegram-бот» або командою /stop, а видалити радар з усім переліченим можна {% if subscription %}нижче{% else %}на цій сторінці, відкритій зі свого радару{% endif %}: одразу і назавжди.</p>
+
+    {% if subscription %}
+    <form method="post" action="{% url 'subscriptions:delete' subscription.token %}" class="panel danger-zone">
+      {% csrf_token %}
+      <div class="danger-text">
+        <h2 class="danger-title">Видалити радар</h2>
+        <p class="field-help">Фільтри, історія надісланих вакансій і зв'язок з Telegram зникнуть.{% if subscription.is_linked %} Бот напише в чат, що його відключено.{% endif %}</p>
+      </div>
+      <label class="check check-sm"><input type="checkbox" name="confirm" value="yes" required><span>Розумію, це назавжди</span></label>
+      <button type="submit" class="btn btn-danger">Видалити радар</button>
+    </form>
+    {% endif %}
+  </div></div>
+</section>
+{% endblock %}

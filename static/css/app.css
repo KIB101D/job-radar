@@ -138,6 +138,8 @@ a:hover { color: var(--lime-hover); }
 @media (max-width: 560px) { .site-nav { gap: 18px; } }
 
 .site-footer { border-top: 1px solid var(--line); }
+.footer-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.footer-link:hover { color: var(--text); }
 .site-footer-inner {
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
   gap: 12px; padding-block: 24px; font-size: 13px; color: var(--faint);
@@ -681,3 +683,12 @@ button.segmented-item:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) {
   .r-sweep, .r-hit, .r-hit > *, .save-status, .pulse, .waiting-ping, .toast { animation: none; }
 }
+
+/* ---- Data page ------------------------------------------------------------------ */
+
+.data-page { max-width: 760px; }
+.data-text { margin: 0; font-size: 16px; line-height: 1.65; color: var(--text-soft); }
+.danger-zone { display: flex; flex-direction: column; gap: 14px; border-color: var(--red-border); }
+.danger-title { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+.btn-danger { align-self: flex-start; background: var(--red-bg); border-color: var(--red-border); color: var(--error); }
+.btn-danger:hover { border-color: var(--error); color: var(--error); }

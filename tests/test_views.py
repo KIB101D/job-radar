@@ -855,3 +855,66 @@ def test_unknown_city_from_an_old_radar_stays_valid(client, subscription):
     assert "Не збережено" not in html
     subscription.refresh_from_db()
     assert subscription.cities == ["Ужгород"] and subscription.levels == ["junior"]
+
+
+# --- data page and deleting a radar ---------------------------------------------------
+
+
+def test_data_page_explains_and_is_linked_from_the_footer(client):
+    html = html_of(client.get(reverse("subscriptions:data")))
+    assert "Що ми зберігаємо" in html and "номер Telegram-чату" in html
+    assert "Видалити радар" not in html  # no radar here
+    assert f'href="{reverse("subscriptions:data")}">Дані<' in html_of(client.get("/"))
+
+
+def test_data_page_of_a_radar_offers_deleting_it(client, subscription):
+    html = html_of(client.get(url("radar_data", subscription)))
+    assert "Видалити радар" in html and url("delete", subscription) in html
+    detail = html_of(client.get(url("detail", subscription)))
+    assert f'href="{url("radar_data", subscription)}">Дані<' in detail
+
+
+def test_data_redirects_to_the_remembered_radar(client, subscription):
+    client.cookies[TOKEN_COOKIE] = subscription.token
+    response = client.get(reverse("subscriptions:data"))
+    assert response["Location"] == url("radar_data", subscription)
+
+
+def test_delete_needs_confirmation(client, subscription):
+    response = client.post(url("delete", subscription))
+    assert response["Location"] == url("radar_data", subscription)
+    assert Subscription.objects.filter(pk=subscription.pk).exists()
+
+
+def test_delete_removes_radar_deliveries_and_cookie(client, subscription, make_vacancy):
+    Delivery.objects.create(subscription=subscription, vacancy=make_vacancy(title="Python"))
+    client.cookies[TOKEN_COOKIE] = subscription.token
+
+    response = client.post(url("delete", subscription), {"confirm": "yes"})
+
+    assert response["Location"] == url("home")
+    assert not Subscription.objects.exists() and not Delivery.objects.exists()
+    assert response.cookies[TOKEN_COOKIE].value == ""  # forgotten by the browser
+    assert client.get(url("detail", subscription)).status_code == 404
+
+
+def test_deleting_a_linked_radar_unlinks_the_bot(client, linked, tg):
+    from bot.models import ChatState
+
+    ChatState.objects.create(chat_id=42, panel_message_id=555, panel_screen="filters")
+
+    client.post(url("delete", linked), {"confirm": "yes"})
+
+    message = tg.sent("sendMessage")[-1]
+    assert message["chat_id"] == 42 and "Радар видалено" in message["text"]
+    assert message["reply_markup"] == {"remove_keyboard": True}
+    assert tg.sent("deleteMessage")[-1] == {"chat_id": 42, "message_id": 555}
+    assert not ChatState.objects.filter(chat_id=42).exists()
+
+
+def test_bot_after_deletion_says_the_chat_is_not_linked(client, linked, tg):
+    """The chat isn't linked to anything any more, so the bot answers as for a stranger."""
+    from subscriptions.delivery import linked_subscription
+
+    client.post(url("delete", linked), {"confirm": "yes"})
+    assert linked_subscription(42) is None

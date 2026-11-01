@@ -5,8 +5,8 @@ from datetime import datetime
 from django import template
 from django.utils import timezone
 
+from radar.attributes import REMOTE_LOCATION
 from radar.matching import matched_keywords
-from radar.services.parser import REMOTE_LOCATION
 
 register = template.Library()
 

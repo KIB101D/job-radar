@@ -25,12 +25,13 @@ from urllib.parse import urlsplit, urlunsplit
 import feedparser
 from bs4 import BeautifulSoup, NavigableString
 
+from radar.attributes import REMOTE_LOCATION, split_outside_parentheses
+
 TITLE_MAX = 300
 COMPANY_MAX = 200
 LOCATION_MAX = 300
 SALARY_MAX = 100
 
-REMOTE_LOCATION = "віддалено"
 _REMOTE_TITLE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
 
 # "$4000–7000", "$600–800", "до $5000", "від $3000", "$3000", "€2000–3000", "30000–40000 грн"
@@ -129,7 +130,7 @@ def split_title(raw_title: str) -> tuple[str, str, str, list[str]]:
     if not sep:
         return title, "", "", []
 
-    parts = _split_outside_parentheses(rest)
+    parts = split_outside_parentheses(rest)
     company = parts[0] if parts else ""
     salary = ""
     locations: list[str] = []
@@ -139,23 +140,6 @@ def split_title(raw_title: str) -> tuple[str, str, str, list[str]]:
         else:
             locations.append(part)
     return position.strip(), company, salary, locations
-
-
-def _split_outside_parentheses(text: str) -> list[str]:
-    """Split on commas, but not inside "(...)": "Вроцлав (Польща)" stays whole."""
-    parts, depth, current = [], 0, []
-    for char in text:
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            depth = max(depth - 1, 0)
-        if char == "," and depth == 0:
-            parts.append("".join(current).strip())
-            current = []
-        else:
-            current.append(char)
-    parts.append("".join(current).strip())
-    return [p for p in parts if p]
 
 
 def detect_remote(position: str, locations: list[str]) -> bool:

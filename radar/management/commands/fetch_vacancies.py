@@ -1,14 +1,8 @@
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand, CommandError
 
-from radar.locks import FETCH_LOCK, job_lock
+from radar.locks import FETCH_LOCK, FETCH_LOCK_TTL, job_lock
 from radar.models import Source
 from radar.services.fetcher import fetch_all_sources
-
-# Longer than a normal run (a few sources x a few seconds), short enough that a
-# crashed run doesn't block the next cron tick for long.
-LOCK_TTL = timedelta(minutes=10)
 
 
 class Command(BaseCommand):
@@ -29,7 +23,7 @@ class Command(BaseCommand):
             self.stdout.write("No enabled sources to fetch.")
             return
 
-        with job_lock(FETCH_LOCK, LOCK_TTL) as acquired:
+        with job_lock(FETCH_LOCK, FETCH_LOCK_TTL) as acquired:
             if not acquired:
                 self.stdout.write("Another fetch is already running, skipping.")
                 return

@@ -8,6 +8,9 @@ from django.utils import timezone
 from .models import JobLock
 
 FETCH_LOCK = "fetch_vacancies"
+# Longer than a normal run (a few sources x a few seconds), short enough that a
+# crashed run doesn't block the next fetch for long.
+FETCH_LOCK_TTL = timedelta(minutes=10)
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 

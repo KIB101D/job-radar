@@ -8,7 +8,7 @@ Job Radar watches the [DOU](https://jobs.dou.ua) vacancy feeds, matches new vaca
 - **Telegram bot**: one tap links the chat to the radar. Digests arrive on a clock-aligned schedule in your time zone (hourly ... daily, with quiet hours), and the bot can check right now, show the latest matches and edit the same filters in a single settings message.
 - **Background jobs** fetch the feeds every 30 minutes, send due digests and once a day mark vacancies that were closed on DOU.
 
-Stack: Python 3.13, Django 5.2, HTMX, Postgres (Neon) / SQLite, httpx, feedparser, BeautifulSoup, GitHub Actions, Render.
+Stack: Python 3.13, Django 5.2, HTMX, Postgres (Neon) / SQLite, httpx, feedparser, BeautifulSoup, GitHub Actions, Vercel.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ flowchart LR
     end
     DOU[(DOU RSS feeds<br/>and vacancy pages)]
     DB[(Neon Postgres)]
-    W[Django on Render<br/>site + webhook]
+    W[Django on Vercel<br/>site + webhook]
     TG[Telegram Bot API]
     U((User))
 
@@ -36,7 +36,7 @@ flowchart LR
     W <--> DB
 ```
 
-The website never scrapes. Web requests only read the database; everything that talks to DOU runs in management commands on a schedule. The site and the jobs share nothing but the database, so the free Render service can sleep while the jobs keep running.
+The website never scrapes. Web requests only read the database; everything that talks to DOU runs in management commands on a schedule. The site and the jobs share nothing but the database, so the site can run as a serverless function on Vercel while the jobs run on a schedule elsewhere.
 
 | App | What it owns |
 | --- | --- |
@@ -46,7 +46,7 @@ The website never scrapes. Web requests only read the database; everything that 
 
 ## Decisions worth explaining
 
-- **Scheduled jobs on GitHub Actions, not in the web process.** Render's free plan sleeps and has no cron. Actions runs `manage.py` against the same Neon database. Every job takes a **DB-backed lock** (one conditional `UPDATE` with a TTL) and is safe to run late, twice or in parallel, which matters because GitHub's scheduler is best-effort.
+- **Scheduled jobs on GitHub Actions, not in the web process.** The site is a serverless function on Vercel: nothing runs between requests, and there's no free scheduler for it. Actions runs `manage.py` against the same Neon database. Every job takes a **DB-backed lock** (one conditional `UPDATE` with a TTL) and is safe to run late, twice or in parallel, which matters because GitHub's scheduler is best-effort.
 - **Dedupe by canonical vacancy URL.** The DOU `guid` carries a changing timestamp, so the same vacancy would come back as "new". A vacancy can be in several feeds (Python and Front End overlap), so feeds are a many-to-many relation, not a column.
 - **Level, salary and city are read at match time.** `radar/attributes.py` parses "Middle+ / Senior" from the title, "$4000–7000" or "до $5000" from the salary text and cities from the location, as pure cached functions. No extra columns, so every stored vacancy gets the filters and a better rule needs no backfill. A title without a level and a vacancy without a salary pass by default: most DOU vacancies name neither.
 - **Matching in Python after a SQL prefilter.** Cheap conditions (active, remote, category) run in SQL; keywords use Unicode-aware word boundaries (`c++`, `.net`, `node.js`, Cyrillic) that SQLite and Postgres don't share. The table holds a few thousand rows, so this stays fast and identical everywhere.
@@ -89,7 +89,7 @@ About 340 tests: RSS parsing on saved DOU fixtures (including broken entries), f
 
 ## Deploy
 
-Render (site + webhook) + Neon (Postgres) + GitHub Actions (jobs), all on free plans. Step by step: **[docs/deploy.md](docs/deploy.md)**.
+Vercel (site + webhook) + Neon (Postgres) + GitHub Actions (jobs), all on free plans. Migrations and the Telegram webhook are set by the production build only, so a preview deploy can't touch the shared database or take the bot. Step by step: **[docs/deploy.md](docs/deploy.md)**.
 
 ## Project layout
 
@@ -100,6 +100,7 @@ subscriptions/     radars, schedule, delivery, website views/forms, template tag
 bot/               Telegram client, webhook, handlers, settings panel, digests
 templates/ static/ server-rendered UI, HTMX, small vanilla JS, CSS
 tests/             pytest suite and DOU fixtures
-bin/build.sh       Render build: install, collectstatic, migrate, set webhook
+bin/vercel_build.py  Vercel build: migrate and set the webhook (production only)
+vercel.json        Vercel: region, deploy only main, function timeout
 .github/workflows/ CI and the three scheduled jobs
 ```

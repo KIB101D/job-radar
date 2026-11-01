@@ -184,6 +184,39 @@
     fit();
   }
 
+  // --- Live refresh guards ----------------------------------------------------------------
+  // The filters and bot cards re-read the database every few seconds. They skip a
+  // round only while you are using them right now: this window has focus and the
+  // focused element is a field with text being typed, or an open-able select.
+  // (Focus merely left on a checkbox you clicked earlier doesn't count: otherwise a
+  // card stopped updating after any click, until the tab was switched.)
+
+  function isTyping(selector) {
+    if (!document.hasFocus()) return false;
+    const field = document.activeElement;
+    if (!field || !field.closest(selector)) return false;
+    if (field.matches("select")) return true;
+    return field.matches('input[type="text"], input:not([type]), textarea') && field.value.trim() !== "";
+  }
+
+  window.JobRadar = { isTyping };
+
+  // Folded filter groups stay unfolded when the card is redrawn with new data.
+  let openGroups = [];
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    if (event.detail.target?.id !== "filters-box") return;
+    openGroups = [...document.querySelectorAll("#filters-box .fgroup[open] .fgroup-label")].map(
+      (label) => label.textContent,
+    );
+  });
+  document.addEventListener("htmx:afterSettle", (event) => {
+    if (!openGroups.length || !document.getElementById("filters-box")?.contains(event.target)) return;
+    document.querySelectorAll("#filters-box .fgroup").forEach((group) => {
+      if (openGroups.includes(group.querySelector(".fgroup-label")?.textContent)) group.open = true;
+    });
+    openGroups = [];
+  });
+
   // --- Copy to clipboard ------------------------------------------------------------------
 
   async function copy(button) {

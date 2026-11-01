@@ -41,3 +41,4 @@
 {% endif %}
 {% if save_status %}{% include "subscriptions/_save_status.html" with oob=True %}{% endif %}
 {% if fragment and version and subscription and not append %}{% include "subscriptions/_filters_sync.html" with oob=True %}{% endif %}
+{% if form_was_stale %}<div id="filters-box" hx-swap-oob="true">{% include "subscriptions/_filters_form.html" with form=fresh_form %}</div>{% endif %}

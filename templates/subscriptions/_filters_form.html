@@ -16,7 +16,7 @@
       data-autosave
       hx-post="{% url 'subscriptions:detail' subscription.token %}"
       hx-trigger="change" hx-sync="this:queue all"
-      hx-vals='js:{changed: event.target.name || ""}'
+      hx-vals='js:{changed: event.target.name || "", v: document.getElementById("filters-sync")?.dataset.version || ""}'
 {% else %}
       hx-get="{% url 'subscriptions:preview' %}"
       hx-trigger="change delay:150ms"

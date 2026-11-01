@@ -517,13 +517,21 @@ def _current_filter_values(request, subscription: Subscription):
 
 
 def _autosave_filters(request, subscription: Subscription):
+    # The page sends the version it shows. If the bot changed something since, the
+    # saved radar now differs from the form in more than the field just changed,
+    # so the answer redraws the form too (otherwise this save would hide that change
+    # from the page's watcher, which only compares versions).
+    stale = request.POST.get("v", "") not in ("", _version(subscription))
     form = FiltersForm(_current_filter_values(request, subscription))
     if not form.is_valid():
         context = {"errors": form.errors, "fragment": True, "save_status": "error"}
         return render(request, "subscriptions/_results.html", context)
     form.save(subscription)
     _sync_bot(subscription)
-    return _render_results(request, subscription, view=VIEW_ALL, save_status="saved")
+    extra = {"save_status": "saved"}
+    if stale:
+        extra.update(form_was_stale=True, fresh_form=FiltersForm.for_subscription(subscription))
+    return _render_results(request, subscription, view=VIEW_ALL, **extra)
 
 
 def _render_results(request, subscription, *, view, offset=0, **extra):

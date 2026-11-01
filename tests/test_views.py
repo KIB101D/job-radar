@@ -935,7 +935,7 @@ def test_own_autosave_moves_the_watcher_on(client, subscription):
     html = html_of(autosave(client, subscription, {"changed": "levels", "levels": ["junior"]}))
     subscription.refresh_from_db()
     version = str(int(subscription.updated_at.timestamp() * 1000))
-    assert 'id="filters-sync" hidden hx-swap-oob="true"' in html
+    assert 'id="filters-sync" hidden data-version="' in html and 'hx-swap-oob="true"' in html
     assert f"filters-form/?v={version}" in html
     refresh = reverse("subscriptions:filters_form", args=[subscription.token])
     assert client.get(f"{refresh}?v={version}").status_code == 204
@@ -952,3 +952,27 @@ def test_bot_card_answers_204_until_the_bot_changes_something(client, linked):
     linked.save()
     html = html_of(client.get(f"{card}?v={version}"))
     assert 'value="hourly" checked' in html
+
+
+def test_autosave_on_a_stale_page_redraws_the_form(client, subscription):
+    """The bot added a word while the page was open; saving here must show it too."""
+    page = html_of(client.get(url("detail", subscription)))
+    old = page.split('data-version="', 1)[1].split('"', 1)[0]
+    subscription.exclude_keywords = ["senior"]  # changed in the bot
+    subscription.save(update_fields=["exclude_keywords", "updated_at"])
+
+    html = html_of(
+        autosave(client, subscription, {"changed": "levels", "levels": ["junior"], "v": old})
+    )
+
+    assert '<div id="filters-box" hx-swap-oob="true">' in html
+    assert 'value="senior"' in html
+
+
+def test_autosave_on_a_current_page_leaves_the_form_alone(client, subscription):
+    page = html_of(client.get(url("detail", subscription)))
+    current = page.split('data-version="', 1)[1].split('"', 1)[0]
+    html = html_of(
+        autosave(client, subscription, {"changed": "levels", "levels": ["junior"], "v": current})
+    )
+    assert 'id="filters-box"' not in html

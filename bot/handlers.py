@@ -185,11 +185,19 @@ def do_latest(subscription: Subscription) -> None:
 
 
 def send_frequency(subscription: Subscription) -> None:
-    get_client().send_message(
+    message = get_client().send_message(
         subscription.chat_id,
         frequency_text(subscription),
         keyboards.frequency_keyboard(subscription),
     )
+    remember_settings_message(subscription, message["message_id"])
+
+
+def remember_settings_message(subscription: Subscription, message_id: int) -> None:
+    """The site edits this message when settings change there (see bot/sync.py)."""
+    if subscription.settings_message_id != message_id:
+        subscription.settings_message_id = message_id
+        subscription.save(update_fields=["settings_message_id"])
 
 
 def frequency_text(subscription: Subscription) -> str:
@@ -311,6 +319,7 @@ def refresh_frequency_message(subscription: Subscription, message: dict) -> None
         frequency_text(subscription),
         keyboards.frequency_keyboard(subscription),
     )
+    remember_settings_message(subscription, message["message_id"])
 
 
 # --- membership ----------------------------------------------------------------------------------

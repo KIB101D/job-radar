@@ -53,6 +53,12 @@ class Subscription(models.Model):
     paused = models.BooleanField(default=False)
 
     # Bookkeeping.
+    settings_message_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="The bot's latest '⏰ Як часто надсилати нове?' message in the chat. "
+        "When settings change on the site, the bot edits this message to match.",
+    )
     linked_at = models.DateTimeField(
         null=True,
         blank=True,

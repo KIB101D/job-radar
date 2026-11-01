@@ -277,10 +277,12 @@ def frequency(request, token: str):
         if "skip" in request.POST:
             subscription.frequency = "off"
             subscription.save(update_fields=["frequency", "updated_at"])
+            _sync_bot(subscription)
             messages.success(request, "Автосповіщення вимкнено. Перевіряй вручну, коли зручно.")
             return redirect("subscriptions:detail", token)
         if form.is_valid():
             form.save()
+            _sync_bot(subscription)
             label = schedule.next_slot_label(subscription)
             text = f"Збережено. Наступне сповіщення {label}." if label else "Збережено."
             messages.success(request, text)
@@ -334,6 +336,7 @@ def notifications(request, token: str):
         saved = form.is_valid()
         if saved:
             form.save()
+            _sync_bot(subscription)
             form = NotificationsForm(instance=subscription)
     context = {
         "subscription": subscription,
@@ -342,6 +345,13 @@ def notifications(request, token: str):
         **_bot_context(subscription),
     }
     return render(request, "subscriptions/_bot_settings.html", context)
+
+
+def _sync_bot(subscription: Subscription) -> None:
+    """Edit the settings message in Telegram to match what was saved here."""
+    from bot.sync import refresh_settings_message  # bot depends on this app, not vice versa
+
+    refresh_settings_message(subscription)
 
 
 def _current_card_values(subscription: Subscription) -> dict:

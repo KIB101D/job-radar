@@ -606,3 +606,95 @@ def test_run_bot_locally_reports_being_offline(tg, monkeypatch, capsys):
 
     assert sleeps == [5]
     assert "getUpdates failed" in capsys.readouterr().err
+
+
+# --- site -> bot: the settings message follows changes made on the site ------------------
+
+
+def site_post(client, sub, **data):
+    return client.post(reverse("subscriptions:notifications", args=[sub.token]), data)
+
+
+def test_bot_remembers_its_settings_message(send, linked):
+    tg = send(message_update(texts.BTN_FREQUENCY))
+    linked.refresh_from_db()
+    assert linked.settings_message_id == tg._next_id  # the id Telegram gave that message
+
+
+def test_site_change_edits_the_settings_message_in_telegram(client, send, linked):
+    tg = send(message_update(texts.BTN_FREQUENCY))
+    message_id = tg._next_id
+
+    with time_machine.travel("2026-11-02 16:40 +02:00", tick=False):
+        site_post(client, linked, changed="frequency", frequency="every_12h")
+
+    edit = tg.sent("editMessageText")[-1]
+    assert edit["message_id"] == message_id
+    assert "Кожні 12 год" in edit["text"] and "о 21:00" in edit["text"]
+    labels = [b["text"] for row in edit["reply_markup"]["inline_keyboard"] for b in row]
+    assert "✅ Кожні 12 год" in labels
+
+
+def test_site_quiet_hours_change_updates_the_button(client, send, linked):
+    tg = send(message_update(texts.BTN_FREQUENCY))
+    site_post(client, linked, changed="quiet_hours_enabled")  # unchecked
+    quiet_button = tg.sent("editMessageText")[-1]["reply_markup"]["inline_keyboard"][-1][0]
+    assert quiet_button == {"text": texts.QUIET_BUTTON_OFF, "callback_data": "quiet:on"}
+
+
+def test_step3_save_also_updates_telegram(client, send, linked):
+    tg = send(message_update(texts.BTN_FREQUENCY))
+    client.post(
+        reverse("subscriptions:frequency", args=[linked.token]),
+        {"frequency": "daily", "quiet_hours_start": "22", "quiet_hours_end": "8"},
+    )
+    assert "Раз на день" in tg.sent("editMessageText")[-1]["text"]
+
+
+def test_no_settings_message_means_no_telegram_call(client, linked, tg):
+    site_post(client, linked, changed="frequency", frequency="hourly")
+    linked.refresh_from_db()
+    assert linked.frequency == Frequency.HOURLY
+    assert tg.sent("editMessageText") == []
+
+
+def test_deleted_settings_message_is_forgotten(client, send, linked):
+    tg = send(message_update(texts.BTN_FREQUENCY))
+    tg.fail_next("editMessageText", 400, "Bad Request: message to edit not found")
+
+    site_post(client, linked, changed="frequency", frequency="hourly")
+
+    linked.refresh_from_db()
+    assert linked.frequency == Frequency.HOURLY  # the site still saved
+    assert linked.settings_message_id is None
+
+
+def test_telegram_outage_does_not_break_the_site(client, send, linked):
+    tg = send(message_update(texts.BTN_FREQUENCY))
+    tg.fail_next("editMessageText", 502, "Bad Gateway")
+
+    response = site_post(client, linked, changed="frequency", frequency="hourly")
+
+    linked.refresh_from_db()
+    assert response.status_code == 200 and linked.frequency == Frequency.HOURLY
+    assert linked.settings_message_id is not None  # kept: it may work next time
+
+
+def test_pressing_buttons_in_older_message_makes_it_the_tracked_one(send, linked):
+    send(callback_update("freq:daily", message_id=55))
+    linked.refresh_from_db()
+    assert linked.settings_message_id == 55
+
+
+def test_site_forms_save_only_their_own_columns(client, linked):
+    """The bot paused the radar after the page loaded; saving filters must keep the pause."""
+    from subscriptions.forms import FiltersForm
+
+    stale = Subscription.objects.get(pk=linked.pk)
+    Subscription.objects.filter(pk=linked.pk).update(paused=True)
+    form = FiltersForm({"include_keywords": "django"})
+    assert form.is_valid()
+    form.save(stale)
+
+    linked.refresh_from_db()
+    assert linked.paused is True and linked.include_keywords == ["django"]

@@ -25,10 +25,17 @@ NO_PREVIEW = {"is_disabled": True}
 
 
 class TelegramError(Exception):
-    def __init__(self, method: str, description: str, error_code: int | None = None):
+    def __init__(
+        self,
+        method: str,
+        description: str,
+        error_code: int | None = None,
+        retry_after: int | None = None,
+    ):
         self.method = method
         self.description = description
         self.error_code = error_code
+        self.retry_after = retry_after  # set by Telegram on 429 Too Many Requests
         super().__init__(f"{method}: {error_code or ''} {description}".strip())
 
     @property
@@ -62,7 +69,8 @@ class TelegramClient:
             raise TelegramError(method, "non-JSON response", response.status_code) from None
         if not data.get("ok"):
             description = data.get("description", "unknown error")
-            raise TelegramError(method, description, data.get("error_code"))
+            retry_after = (data.get("parameters") or {}).get("retry_after")
+            raise TelegramError(method, description, data.get("error_code"), retry_after)
         return data["result"]
 
     # --- messages -----------------------------------------------------------------

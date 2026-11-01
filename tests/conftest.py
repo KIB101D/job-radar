@@ -82,8 +82,10 @@ class FakeTelegram:
         self.updates: list[dict] = []
         self.webhook_url = ""
 
-    def fail_next(self, method: str, code: int, description: str) -> None:
-        self._failures[method] = (code, description)
+    def fail_next(self, method: str, code, description: str, parameters=None) -> None:
+        self._failures[method] = (
+            (code, description, parameters) if parameters else (code, description)
+        )
 
     def handler(self, request):
         import json
@@ -94,8 +96,10 @@ class FakeTelegram:
         payload = json.loads(request.content or b"{}")
         self.calls.append((method, payload))
         if method in self._failures:
-            code, description = self._failures.pop(method)
+            code, description, *extra = self._failures.pop(method)
             body = {"ok": False, "error_code": code, "description": description}
+            if extra:
+                body["parameters"] = extra[0]
             return httpx.Response(200, json=body)
         result = {
             "getMe": {"id": 1, "is_bot": True, "username": "job_radar_test_bot"},
@@ -124,11 +128,11 @@ def tg(monkeypatch):
     """Replace the Telegram client with one whose HTTP goes to FakeTelegram."""
     import httpx
 
-    from bot import handlers, sync, telegram
+    from bot import digests, handlers, sync, telegram
 
     fake = FakeTelegram()
     client = telegram.TelegramClient("123:test-token", transport=httpx.MockTransport(fake.handler))
-    for module in (telegram, handlers, sync):
+    for module in (telegram, handlers, sync, digests):
         monkeypatch.setattr(module, "get_client", lambda: client)
     from bot.management.commands import run_bot_locally, set_telegram_webhook
 

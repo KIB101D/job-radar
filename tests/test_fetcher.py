@@ -140,7 +140,7 @@ def test_one_broken_source_does_not_stop_others(load_fixture, no_sleep):
 
     results = fetch_all_sources(client=make_client(handler), sleep=no_sleep)
 
-    assert len(results) == 4  # seeded sources
+    assert len(results) == Source.objects.count()  # every seeded source
     assert [r.ok for r in results].count(False) == 1
     assert Vacancy.objects.count() == 25
 
@@ -152,7 +152,7 @@ def test_sources_are_fetched_sequentially_with_pause(settings, load_fixture, no_
 
     fetch_all_sources(client=client, sleep=no_sleep)
 
-    assert no_sleep.calls == [2, 2, 2]  # 4 sources -> 3 pauses
+    assert no_sleep.calls == [2] * (Source.objects.count() - 1)  # a pause between sources
 
 
 @pytest.mark.django_db

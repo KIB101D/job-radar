@@ -97,3 +97,13 @@ def test_repeated_ingest_does_not_duplicate_feed_links(python_source, items):
     ingest(python_source, items)
 
     assert Vacancy.sources.through.objects.count() == 25
+
+
+@pytest.mark.django_db
+def test_dou_feeds_seeded_for_all_categories():
+    from radar.models import Source
+
+    categories = set(Source.objects.values_list("category", flat=True))
+    assert {"Python", "Front End", "QA", "DevOps", "Data Science", "C++", "AI/ML"} <= categories
+    assert Source.objects.get(category="C++").feed_url.endswith("?category=C%2B%2B")
+    assert Source.objects.get(category="AI/ML").feed_url.endswith("?category=AI%2FML")

@@ -9,7 +9,7 @@ from django.utils import timezone
 from radar.models import Source
 from subscriptions.models import Delivery, Frequency, Subscription
 from subscriptions.templatetags.radar_ui import ago, ago_short, places, uk_plural_form, where
-from subscriptions.views import TOKEN_COOKIE
+from subscriptions.views import BEAM_BEARING, SWEEP_SECONDS, TOKEN_COOKIE, hit_delay
 
 pytestmark = pytest.mark.django_db
 
@@ -165,6 +165,23 @@ def test_home_links_to_existing_radar(client, subscription):
     html = html_of(client.get("/"))
     assert "Відкрити мій радар" in html and url("detail", subscription) in html
     assert url("radar_bot", subscription) in html
+
+
+def test_hero_blip_lights_up_when_the_beam_reaches_it():
+    assert hit_delay(BEAM_BEARING) == 0  # under the beam at load: flashes at once
+    assert hit_delay(BEAM_BEARING + 90) == pytest.approx(SWEEP_SECONDS / 4)
+    assert hit_delay(BEAM_BEARING - 1) == pytest.approx(SWEEP_SECONDS * 359 / 360)
+
+
+def test_hero_radar_renders_trail_and_beam_synced_blips(client, make_vacancy):
+    make_vacancy(title="Python dev")
+    make_vacancy(title="Django dev")
+    html = html_of(client.get("/"))
+
+    assert html.count('class="r-trail"') == 24
+    assert html.count('class="r-hit" style="--d: ') == 2
+    assert 'style="--d: 0.00s"' in html  # the newest blip sits under the beam
+    assert "," not in html.split('class="hero-radar"', 1)[1].split("</svg>", 1)[0].split("<text")[0]
 
 
 # --- radar page ------------------------------------------------------------------------

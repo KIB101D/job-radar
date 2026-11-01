@@ -1,19 +1,39 @@
-{% load l10n %}{% localize off %}<svg class="hero-radar" viewBox="0 0 440 440" role="img" aria-label="Радар: найсвіжіші вакансії ближче до центру">
+{% load l10n %}{% comment %}
+  Hero radar. The beam turns once per --sweep; every blip carries --d, the moment the
+  beam first reaches it (views.hit_delay), so its flash/fade cycle is locked to the beam:
+  it flares as the beam passes, holds while the trail covers it and fades out inside
+  the trail. With reduced motion everything is static and fully visible.
+{% endcomment %}{% localize off %}<svg class="hero-radar" viewBox="0 0 440 440" role="img" aria-label="Радар: найсвіжіші вакансії ближче до центру" style="--sweep: {{ sweep_seconds|default:'6' }}s">
+  <defs>
+    <clipPath id="r-clip"><circle cx="220" cy="220" r="209"/></clipPath>
+    <filter id="r-blur" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="r-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
   <circle cx="220" cy="220" r="210" class="r-face"/>
   <circle cx="220" cy="220" r="158" class="r-ring"/>
   <circle cx="220" cy="220" r="106" class="r-ring"/>
   <circle cx="220" cy="220" r="54" class="r-ring"/>
   <path d="M10 220H430M220 10V430" class="r-axis"/>
-  <g class="r-sweep">
-    <path d="M220 220 L220 10 A210 210 0 0 1 368.5 71.5 Z" class="r-wedge"/>
-    <path d="M220 220 L368.5 71.5" class="r-beam"/>
+  <g clip-path="url(#r-clip)">
+    <g class="r-sweep">
+      <g filter="url(#r-blur)">
+        {% for slice in trail %}<path d="{{ slice.d }}" class="r-trail" fill-opacity="{{ slice.opacity }}"/>{% endfor %}
+      </g>
+      <path d="M220 220 L368.5 71.5" class="r-beam-glow" filter="url(#r-glow)"/>
+      <path d="M220 220 L368.5 71.5" class="r-beam"/>
+    </g>
   </g>
   {% for b in blips %}
-    <circle cx="{{ b.x }}" cy="{{ b.y }}" r="{{ b.r }}" class="r-blip" fill-opacity="{{ b.opacity }}"/>
-    {% if b.ring %}<circle cx="{{ b.x }}" cy="{{ b.y }}" r="12" class="r-blip-ring"/>{% endif %}
+    <g class="r-hit" style="--d: {{ b.delay }}s">
+      <circle cx="{{ b.x }}" cy="{{ b.y }}" r="{{ b.r|add:6 }}" class="r-flash" filter="url(#r-glow)"/>
+      <circle cx="{{ b.x }}" cy="{{ b.y }}" r="{{ b.r }}" class="r-blip" fill-opacity="{{ b.opacity }}"/>
+      {% if b.ring %}<circle cx="{{ b.x }}" cy="{{ b.y }}" r="12" class="r-ping"/>{% endif %}
+    </g>
     {% if b.label %}
-      <rect x="{{ b.label.x }}" y="{{ b.label.y }}" width="{{ b.label.w }}" height="28" rx="6" class="r-label"/>
-      <text x="{{ b.label.tx }}" y="{{ b.label.ty }}" class="r-label-text">{{ b.label.text }}</text>
+      <g class="r-label-in" style="--d: {{ b.delay }}s"><g class="r-label-pulse">
+        <rect x="{{ b.label.x }}" y="{{ b.label.y }}" width="{{ b.label.w }}" height="28" rx="6" class="r-label"/>
+        <text x="{{ b.label.tx }}" y="{{ b.label.ty }}" class="r-label-text">{{ b.label.text }}</text>
+      </g></g>
     {% endif %}
   {% endfor %}
   <circle cx="220" cy="220" r="4" class="r-centre"/>

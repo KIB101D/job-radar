@@ -20,7 +20,6 @@ HTMX fragments:
 """
 
 import math
-import random
 from datetime import timedelta
 
 from django.conf import settings
@@ -101,13 +100,58 @@ def _results_context(subscription, filters: Filters, page, **extra) -> dict:
     }
 
 
+# Hero radar animation. The beam turns once per SWEEP_SECONDS; at rotation 0 its
+# leading edge points to BEAM_BEARING (degrees clockwise from 12 o'clock).
+SWEEP_SECONDS = 6.0
+BEAM_BEARING = 45.0
+TRAIL_DEGREES = 100.0  # long enough for a blip to fade while still inside the trail
+TRAIL_SLICES = 24
+TRAIL_MAX_OPACITY = 0.3
+
+
+def _polar(cx: float, cy: float, r: float, bearing: float) -> tuple[float, float]:
+    rad = math.radians(bearing)
+    return cx + r * math.sin(rad), cy - r * math.cos(rad)
+
+
+def hit_delay(bearing: float) -> float:
+    """Seconds after page load when the beam first passes `bearing`."""
+    return ((bearing - BEAM_BEARING) % 360) / 360 * SWEEP_SECONDS
+
+
+def radar_trail(size=440, radius=210) -> list[dict]:
+    """
+    The green trail behind the beam as thin wedges, faint at the tail and bright at
+    the beam (SVG has no conic gradient). Blurred in the template, so the slices
+    blend into one smooth fade.
+    """
+    centre = size / 2
+    step = TRAIL_DEGREES / TRAIL_SLICES
+    slices = []
+    for i in range(TRAIL_SLICES):
+        start = BEAM_BEARING - TRAIL_DEGREES + i * step
+        end = start + step + 0.6  # slight overlap: no hairline seams between slices
+        x1, y1 = _polar(centre, centre, radius, start)
+        x2, y2 = _polar(centre, centre, radius, end)
+        slices.append(
+            {
+                "d": f"M{centre:.1f} {centre:.1f} L{x1:.1f} {y1:.1f} "
+                f"A{radius} {radius} 0 0 1 {x2:.1f} {y2:.1f} Z",
+                "opacity": f"{TRAIL_MAX_OPACITY * ((i + 1) / TRAIL_SLICES) ** 1.8:.3f}",
+            }
+        )
+    return slices
+
+
 def radar_blips(vacancies, *, now=None, size=440) -> list[dict]:
     """
     Blips for the hero radar, newest first. Each next blip turns by the golden
     angle and sits a bit further out, so they spread evenly, never overlap, and
     the freshest are closest to the centre. The two newest get a label like
-    "Python · 2 хв". Coordinates are strings, so Ukrainian number formatting
-    can never turn "86.7" into "86,7" inside SVG attributes.
+    "Python · 2 хв". Each blip's animation is delayed until the beam reaches it,
+    so it lights up exactly as the beam passes and fades inside the trail.
+    Numbers are strings, so Ukrainian number formatting can never turn "86.7"
+    into "86,7" inside SVG attributes.
     """
     from .templatetags.radar_ui import ago_short
 
@@ -118,16 +162,15 @@ def radar_blips(vacancies, *, now=None, size=440) -> list[dict]:
     for index, vacancy in enumerate(shown):
         spread = (index / max(len(shown) - 1, 1)) ** 0.8
         radius = inner + spread * (outer - inner)
-        angle = math.radians(-45 + index * 137.508)  # first blip upper right
-        x = centre + radius * math.cos(angle)
-        y = centre + radius * math.sin(angle)
+        bearing = (45 + index * 137.508) % 360  # golden angle; the first one upper right
+        x, y = _polar(centre, centre, radius, bearing)
         blip = {
             "x": f"{x:.1f}",
             "y": f"{y:.1f}",
             "r": 6 if index == 0 else max(5 - index // 2, 3),
-            "opacity": f"{max(1 - index * 0.11, 0.25):.2f}",
+            "opacity": f"{max(1 - index * 0.11, 0.35):.2f}",
             "ring": index == 0,
-            "delay": f"{random.Random(vacancy.pk).uniform(0, 6):.2f}",
+            "delay": f"{hit_delay(bearing):.2f}",
         }
         if index < 2:
             category = vacancy.categories[0] if vacancy.categories else "DOU"
@@ -166,6 +209,8 @@ def home(request):
     context = {
         "existing": _cookie_radar(request),
         "blips": radar_blips(fresh_feed(limit=HERO_BLIPS)),
+        "trail": radar_trail(),
+        "sweep_seconds": f"{SWEEP_SECONDS:g}",
     }
     return render(request, "subscriptions/home.html", context)
 

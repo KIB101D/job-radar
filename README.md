@@ -4,7 +4,7 @@
 
 Job Radar watches the [DOU](https://jobs.dou.ua) vacancy feeds, matches new vacancies against your filters and tells you about them on a website and in Telegram ([@job_radar_dou_bot](https://t.me/job_radar_dou_bot)).
 
-- **Website** (Ukrainian UI): set keywords, excluded words, DOU categories and "remote only"; the matching list updates as you type, polls for new vacancies every minute and marks fresh ones. No account: a radar is a private link.
+- **Website** (Ukrainian UI): keywords, excluded words, 18 DOU categories, level (Intern ... Lead, read from the title), remote or cities (the ones vacancies actually list), minimum salary in USD (with or without vacancies that name none) and how fresh the list should be. Changes save at once, the list polls for new vacancies every minute and marks fresh ones. No account: a radar is a private link.
 - **Telegram bot**: one tap links the chat to the radar. Digests arrive on a clock-aligned schedule in your time zone (hourly ... daily, with quiet hours), and the bot can check right now, show the latest matches and edit the same filters in a single settings message.
 - **Background jobs** fetch the feeds every 30 minutes, send due digests and once a day mark vacancies that were closed on DOU.
 
@@ -48,6 +48,7 @@ The website never scrapes. Web requests only read the database; everything that 
 
 - **Scheduled jobs on GitHub Actions, not in the web process.** Render's free plan sleeps and has no cron. Actions runs `manage.py` against the same Neon database. Every job takes a **DB-backed lock** (one conditional `UPDATE` with a TTL) and is safe to run late, twice or in parallel, which matters because GitHub's scheduler is best-effort.
 - **Dedupe by canonical vacancy URL.** The DOU `guid` carries a changing timestamp, so the same vacancy would come back as "new". A vacancy can be in several feeds (Python and Front End overlap), so feeds are a many-to-many relation, not a column.
+- **Level, salary and city are read at match time.** `radar/attributes.py` parses "Middle+ / Senior" from the title, "$4000–7000" or "до $5000" from the salary text and cities from the location, as pure cached functions. No extra columns, so every stored vacancy gets the filters and a better rule needs no backfill. A title without a level and a vacancy without a salary pass by default: most DOU vacancies name neither.
 - **Matching in Python after a SQL prefilter.** Cheap conditions (active, remote, category) run in SQL; keywords use Unicode-aware word boundaries (`c++`, `.net`, `node.js`, Cyrillic) that SQLite and Postgres don't share. The table holds a few thousand rows, so this stays fast and identical everywhere.
 - **Digests are idempotent.** A slot is claimed with one conditional `UPDATE` on `last_digest_at`; if Telegram fails, the claim is released for the next run. Vacancies are marked delivered only after Telegram accepted the message. Telegram webhook retries are de-duplicated by `update_id`.
 - **The schedule is clock-aligned in the user's time zone.** "Every 3 hours" means 09:00, 12:00, 15:00 ... local time, not "3 hours after the last one". Quiet hours move a slot to the end of the window, DST included (`subscriptions/schedule.py`).

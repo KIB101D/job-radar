@@ -38,7 +38,8 @@ jobs:
         env:
           DEBUG: "False"
           SECRET_KEY: ci-only-not-secret-but-long-enough-for-the-deploy-check-1234567890
-          RENDER_EXTERNAL_HOSTNAME: job-radar.onrender.com
+          VERCEL: "1"
+          VERCEL_PROJECT_PRODUCTION_URL: job-radar.vercel.app
 
   test:
     runs-on: ubuntu-latest

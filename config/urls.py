@@ -6,7 +6,7 @@ from bot.views import webhook
 
 
 def healthz(request):
-    """Render's health check: the process answers. No DB, so Neon can stay asleep."""
+    """Uptime check: the app answers. No DB, so Neon can stay asleep."""
     return HttpResponse("ok", content_type="text/plain")
 
 

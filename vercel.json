@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["fra1"],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "**": false
+    }
+  },
+  "functions": {
+    "config/wsgi.py": {
+      "maxDuration": 120,
+      "excludeFiles": "{tests/**,docs/**,.github/**}"
+    }
+  }
+}

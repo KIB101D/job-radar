@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 _env_file = BASE_DIR / ".env"
-if _env_file.exists():
+if _env_file.exists() and env.bool("READ_DOT_ENV", default=True):  # tests turn it off
     environ.Env.read_env(_env_file)
 
 DEBUG = env.bool("DEBUG", default=False)
@@ -28,12 +28,19 @@ else:
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
-# Render sets this to the service's public host (job-radar.onrender.com), so a
-# fresh deploy works without hand-editing the host lists.
-RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="")
-if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+# On Vercel: the production domain (job-radar.vercel.app, or a custom one) and the
+# URLs of this very deployment are trusted automatically, so a fresh deploy works
+# without hand-editing the host lists. Vercel gives them without "https://".
+ON_VERCEL = env.bool("VERCEL", default=False)
+VERCEL_PRODUCTION_HOST = env("VERCEL_PROJECT_PRODUCTION_URL", default="")
+for _host in (
+    VERCEL_PRODUCTION_HOST,
+    env("VERCEL_URL", default=""),
+    env("VERCEL_BRANCH_URL", default=""),
+):
+    if _host:
+        ALLOWED_HOSTS.append(_host)
+        CSRF_TRUSTED_ORIGINS.append(f"https://{_host}")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -82,7 +89,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=env.int("DB_CONN_MAX_AGE", default=60),
+        # Serverless functions on Vercel come and go: no connections kept between
+        # requests there (Neon's pooler does the pooling).
+        conn_max_age=env.int("DB_CONN_MAX_AGE", default=0 if ON_VERCEL else 60),
         conn_health_checks=True,
     )
 }
@@ -120,17 +129,16 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 if not DEBUG:
-    # Render terminates HTTPS and redirects http:// to https:// at its edge, so
-    # Django only needs to trust the forwarded scheme (no SECURE_SSL_REDIRECT,
-    # which would also redirect Render's internal health checks).
+    # The platform (Vercel) terminates HTTPS and redirects http:// to https:// at
+    # its edge, so Django only needs to trust the forwarded scheme.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=60 * 60 * 24 * 30)
     SILENCED_SYSTEM_CHECKS = [
-        "security.W008",  # SECURE_SSL_REDIRECT: Render redirects to HTTPS itself (see above)
+        "security.W008",  # SECURE_SSL_REDIRECT: the platform redirects to HTTPS (see above)
         "security.W005",  # HSTS for subdomains / preload: not ours to decide on
-        "security.W021",  # *.onrender.com
+        "security.W021",  # *.vercel.app
     ]
 
 # --- Job Radar ---------------------------------------------------------------
@@ -138,8 +146,8 @@ if not DEBUG:
 # Public base URL of the site, used in bot messages and for the Telegram webhook.
 SITE_URL = env(
     "SITE_URL",
-    default=f"https://{RENDER_EXTERNAL_HOSTNAME}"
-    if RENDER_EXTERNAL_HOSTNAME
+    default=f"https://{VERCEL_PRODUCTION_HOST}"
+    if VERCEL_PRODUCTION_HOST
     else "http://localhost:8000",
 ).rstrip("/")
 

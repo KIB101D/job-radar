@@ -5,6 +5,5 @@ httpx==0.28.1
 feedparser==6.0.14
 beautifulsoup4==4.15.0
 psycopg[binary]==3.3.6
-gunicorn==26.2.0
 whitenoise==6.12.0
 segno==1.6.6

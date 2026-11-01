@@ -1,5 +1,5 @@
 # Reusable: run one management command against the production database (Neon).
-# The scheduled workflows below call it; the site on Render never scrapes or
+# The scheduled workflows below call it; the site on Vercel never scrapes or
 # sends digests itself.
 name: manage.py
 

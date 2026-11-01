@@ -230,19 +230,49 @@ a:hover { color: var(--lime-hover); }
 @keyframes sweep { to { transform: rotate(360deg); } }
 
 /* Blips: each animation starts at --d, the moment the beam first reaches the blip,
-   and repeats once per turn. The trail covers ~28% of a turn: a blip and its label
-   flare, stay while the trail covers them and are gone once it has passed. */
+   and repeats once per turn. Like a radar's phosphor, a blip doesn't turn
+   transparent: it flares lime, keeps its glow and cools through darker greens
+   until it is the colour of the screen, about when the trail (~28% of a turn)
+   has passed. Only then is it hidden, which by now changes nothing visible. */
 .r-hit, .r-hit > * {
   animation-duration: var(--sweep, 9s); animation-delay: var(--d, 0s);
   animation-iteration-count: infinite; animation-fill-mode: backwards;
 }
-.r-hit { animation-name: blip-life; animation-timing-function: linear; }
-.r-hit > .r-blip { animation-name: blip-pop; animation-timing-function: ease-out; }
-.r-hit > .r-flash { animation-name: blip-flash; animation-timing-function: ease-out; }
+.r-hit { animation-name: blip-life; animation-timing-function: step-end; }
+.r-hit > .r-blip { animation-name: blip-pop, blip-cool; animation-timing-function: ease-out, linear; }
+.r-hit > .r-flash { animation-name: blip-glow; animation-timing-function: linear; }
 .r-hit > .r-ping { animation-name: blip-ping; animation-timing-function: ease-out; }
-@keyframes blip-life { 0% { opacity: 0; } 1.5%, 21% { opacity: 1; } 27%, 100% { opacity: 0; } }
+.r-hit > .r-label { animation-name: label-cool; animation-timing-function: linear; }
+.r-hit > .r-label-text { animation-name: label-text-cool; animation-timing-function: linear; }
+/* Hidden until the beam first reaches it (fill-mode backwards uses the 0% frame). */
+@keyframes blip-life { 0% { opacity: 0; } 0.1% { opacity: 1; } 33%, 100% { opacity: 0; } }
 @keyframes blip-pop { 0% { transform: scale(0.3); } 2.5% { transform: scale(1.6); } 8%, 100% { transform: scale(1); } }
-@keyframes blip-flash { 0% { opacity: 0; } 1.5% { opacity: 0.9; } 10%, 100% { opacity: 0; } }
+@keyframes blip-cool {
+  0%, 6% { fill: var(--lime); }
+  14% { fill: #8fc24a; }
+  21% { fill: #4f7a26; }
+  27% { fill: #26391a; }
+  32%, 100% { fill: #121a17; }
+}
+@keyframes blip-glow {
+  0% { opacity: 0; fill: var(--lime); }
+  1.5% { opacity: 0.9; fill: var(--lime); }
+  8% { opacity: 0.6; fill: var(--lime); }
+  21% { opacity: 0.45; fill: #4f7a26; }
+  32%, 100% { opacity: 0; fill: #26391a; }
+}
+@keyframes label-cool {
+  0%, 6% { fill: var(--panel); stroke: var(--border-strong); }
+  21% { fill: #121a17; stroke: #22331a; }
+  32%, 100% { fill: #10161d; stroke: #10161d; }
+}
+@keyframes label-text-cool {
+  0%, 6% { fill: var(--text); }
+  14% { fill: #a6cf6a; }
+  21% { fill: #557a33; }
+  27% { fill: #2a3d1d; }
+  32%, 100% { fill: #121a17; }
+}
 @keyframes blip-ping { 0% { opacity: 0.8; transform: scale(0.5); } 15%, 100% { opacity: 0; transform: scale(2.2); } }
 
 

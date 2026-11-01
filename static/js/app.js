@@ -136,7 +136,10 @@
 
   function resetFilters(form) {
     form.querySelectorAll("[data-chips]").forEach((root) => root.chipsReset?.());
-    form.querySelectorAll('input[type="checkbox"]').forEach((box) => (box.checked = false));
+    form
+      .querySelectorAll('input[type="checkbox"]')
+      .forEach((box) => (box.checked = box.hasAttribute("data-default-checked")));
+    form.querySelectorAll("select[data-default]").forEach((select) => (select.value = select.dataset.default));
     form.dispatchEvent(new Event("change", { bubbles: true }));
   }
 

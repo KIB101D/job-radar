@@ -385,7 +385,9 @@ def test_preview_shows_unsaved_filters_without_saving(client, subscription, make
 
 
 def test_preview_with_saved_filters_has_no_unsaved_note(client, subscription):
-    query = f"?include_keywords=python&categories=Python&token={subscription.token}"
+    query = (
+        f"?include_keywords=python&categories=Python&salary_unknown=on&token={subscription.token}"
+    )
     assert "попередній перегляд" not in html_of(client.get(url("preview", query=query)))
 
 
@@ -766,3 +768,69 @@ def test_health_check_answers_without_touching_the_database(client, django_asser
     with django_assert_num_queries(0):
         response = client.get("/healthz/")
     assert response.status_code == 200 and response.content == b"ok"
+
+
+# --- level, city, salary, freshness on the site ----------------------------------------
+
+
+def test_filters_page_offers_levels_cities_salary_and_freshness(client, subscription, make_vacancy):
+    make_vacancy(title="A", location="Київ, Львів")
+    make_vacancy(title="B", location="Львів")
+    html = html_of(client.get(url("detail", subscription)))
+
+    assert 'name="levels" value="junior"' in html
+    assert 'name="remote_only"' in html
+    assert html.index('value="Львів"') < html.index('value="Київ"')  # most common first
+    assert 'name="salary_min"' in html and "від $1000" in html
+    assert 'name="salary_unknown"' in html and 'name="max_age_days"' in html
+
+
+@pytest.mark.parametrize(
+    ("changed", "data", "field", "expected"),
+    [
+        ("levels", {"levels": ["senior", "junior"]}, "levels", ["junior", "senior"]),
+        ("cities", {"cities": ["Львів"]}, "cities", ["Львів"]),
+        ("salary_min", {"salary_min": "2000"}, "salary_min", 2000),
+        ("salary_unknown", {}, "salary_unknown", False),
+        ("max_age_days", {"max_age_days": "3"}, "max_age_days", 3),
+    ],
+)
+def test_autosave_new_fields(client, subscription, changed, data, field, expected):
+    autosave(client, subscription, {"changed": changed, **data})
+    subscription.refresh_from_db()
+    assert getattr(subscription, field) == expected
+    assert subscription.include_keywords == ["python"]  # untouched
+
+
+def test_freshness_hides_old_vacancies_on_the_site_only(client, subscription, make_vacancy):
+    make_vacancy(title="Python new")
+    make_vacancy(title="Python old", published_at=timezone.now() - timedelta(days=5))
+    subscription.max_age_days = 3
+    subscription.save()
+
+    results = html_of(client.get(url("results", subscription)))
+    assert "Python new" in results and "Python old" not in results
+
+    from subscriptions.delivery import newest_matches
+
+    titles = [v.title for v in newest_matches(subscription, limit=10).vacancies]
+    assert "Python old" in titles  # the bot ignores it
+
+
+def test_preview_applies_salary_and_level(client, make_vacancy):
+    make_vacancy(title="Junior Python Developer", salary_text="$1000–1500")
+    make_vacancy(title="Senior Python Developer", salary_text="$5000")
+    make_vacancy(title="Junior Python Engineer", salary_text="$500")
+    query = "?levels=junior&salary_min=1000&salary_unknown=on"
+    html = html_of(client.get(url("preview", query=query)))
+    assert "Junior Python Developer" in html
+    assert "Senior Python Developer" not in html and "Junior Python Engineer" not in html
+
+
+def test_unknown_city_from_an_old_radar_stays_valid(client, subscription):
+    subscription.cities = ["Ужгород"]
+    subscription.save()
+    html = html_of(autosave(client, subscription, {"changed": "levels", "levels": ["junior"]}))
+    assert "Не збережено" not in html
+    subscription.refresh_from_db()
+    assert subscription.cities == ["Ужгород"] and subscription.levels == ["junior"]

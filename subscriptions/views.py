@@ -98,10 +98,16 @@ def _fresh_after():
     return timezone.now() - timedelta(hours=FRESH_HOURS)
 
 
+def _published_after(max_age_days: int):
+    """The site-only "Свіжість" setting as a cutoff (None = all)."""
+    return timezone.now() - timedelta(days=max_age_days) if max_age_days else None
+
+
 def _search(subscription, filters: Filters, *, view=VIEW_ALL, offset=0, limit=PAGE_SIZE):
     """
-    "Усі" = every match; "Нові" = what the cards mark НОВА: first seen in the last
-    FRESH_HOURS and not sent to this radar's Telegram chat yet.
+    "Усі" = every match published within the radar's "Свіжість"; "Нові" = what the
+    cards mark НОВА: first seen in the last FRESH_HOURS and not sent to this radar's
+    Telegram chat yet.
     """
     if view == VIEW_NEW and subscription is not None:
         return search(
@@ -111,7 +117,8 @@ def _search(subscription, filters: Filters, *, view=VIEW_ALL, offset=0, limit=PA
             fresh_after=_fresh_after(),
             skip_delivered_to=subscription,
         )
-    return search(filters, offset=offset, limit=limit)
+    max_age = subscription.max_age_days if subscription is not None else 0
+    return search(filters, offset=offset, limit=limit, published_after=_published_after(max_age))
 
 
 def _view_param(request) -> str:
@@ -472,6 +479,9 @@ def _version(subscription: Subscription) -> str:
     return str(int(subscription.updated_at.timestamp() * 1000))
 
 
+LIST_FIELDS = ("categories", "cities", "levels")  # checkbox groups: several values
+
+
 def _current_filter_values(request, subscription: Subscription):
     """
     Form data for an auto-save: the ONE field the user just changed (`changed`,
@@ -487,11 +497,16 @@ def _current_filter_values(request, subscription: Subscription):
     data["include_keywords"] = ", ".join(subscription.include_keywords)
     data["exclude_keywords"] = ", ".join(subscription.exclude_keywords)
     data.setlist("categories", [c for c in subscription.categories if c in known])
-    if subscription.remote_only:
-        data["remote_only"] = "on"
+    data.setlist("cities", subscription.cities)
+    data.setlist("levels", subscription.levels)
+    data["salary_min"] = str(subscription.salary_min)
+    data["max_age_days"] = str(subscription.max_age_days)
+    for flag in ("remote_only", "salary_unknown"):
+        if getattr(subscription, flag):
+            data[flag] = "on"
     data.pop(changed, None)  # an unticked checkbox isn't sent at all
-    if changed == "categories":
-        data.setlist("categories", request.POST.getlist("categories"))
+    if changed in LIST_FIELDS:
+        data.setlist(changed, request.POST.getlist(changed))
     elif changed in request.POST:
         data[changed] = request.POST[changed]
     return data
@@ -595,15 +610,13 @@ def preview(request):
         return render(
             request, "subscriptions/_results.html", {"errors": form.errors, "fragment": True}
         )
-    data = form.cleaned_data
-    filters = Filters(
-        include=tuple(data["include_keywords"]),
-        exclude=tuple(data["exclude_keywords"]),
-        categories=frozenset(data["categories"]),
-        remote_only=data["remote_only"],
-    )
+    filters = form.filters()
     limit = PAGE_SIZE if subscription else PREVIEW_SIZE
-    page = search(filters, limit=limit)
+    page = search(
+        filters,
+        limit=limit,
+        published_after=_published_after(form.cleaned_data["max_age_days"] or 0),
+    )
     unsaved = subscription is not None and filters != Filters.from_subscription(subscription)
     context = _results_context(
         subscription, filters, page, preview=True, unsaved=unsaved, fragment=True

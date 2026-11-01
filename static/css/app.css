@@ -347,6 +347,8 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 
 .check { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 15px; cursor: pointer; }
 .check input { width: 18px; height: 18px; margin: 0; accent-color: var(--lime); }
+.check-sm { min-height: 32px; font-size: 14px; color: var(--text-soft); }
+.filters .select { width: 100%; }
 
 .bookmark { padding-inline: 4px; }
 

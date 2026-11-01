@@ -38,7 +38,17 @@ class Subscription(models.Model):
     include_keywords = models.JSONField(default=list, blank=True)
     exclude_keywords = models.JSONField(default=list, blank=True)
     categories = models.JSONField(default=list, blank=True)  # Source.category values
+    # "Місто": remote OR one of the cities (radar/matching.py). The field keeps its
+    # old name: on its own it still means "only remote".
     remote_only = models.BooleanField(default=False)
+    cities = models.JSONField(default=list, blank=True)
+    levels = models.JSONField(default=list, blank=True)  # radar.attributes.LEVELS
+    salary_min = models.PositiveIntegerField(default=0)  # USD, 0 = any
+    salary_unknown = models.BooleanField(
+        default=True, help_text="With a minimum salary, still show vacancies that name none."
+    )
+    # Site only: hide vacancies published more than this many days ago (0 = all).
+    max_age_days = models.PositiveSmallIntegerField(default=0)
 
     # Delivery settings.
     frequency = models.CharField(max_length=20, choices=Frequency.choices, default=Frequency.DAILY)

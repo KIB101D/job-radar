@@ -54,7 +54,44 @@
     {% for error in form.categories.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
   </fieldset>
 
-  <label class="check">{{ form.remote_only }}<span>{{ form.remote_only.label }}</span></label>
+  <fieldset class="field">
+    <legend class="field-label">{{ form.levels.label }}</legend>
+    <div class="toggle-chips">
+      {% for choice in form.levels %}
+        <label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+      {% endfor %}
+    </div>
+    <p class="field-help">{{ form.levels.help_text }}</p>
+  </fieldset>
+
+  <fieldset class="field">
+    <legend class="field-label">{{ form.cities.label }}</legend>
+    <div class="toggle-chips">
+      <label class="toggle-chip">{{ form.remote_only }}<span>{{ form.remote_only.label }}</span></label>
+      {% for choice in form.cities %}
+        <label class="toggle-chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+      {% endfor %}
+    </div>
+    <p class="field-help">{{ form.cities.help_text }} Нічого не вибрано: будь-де.</p>
+    {% for error in form.cities.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </fieldset>
+
+  <div class="field">
+    <label class="field-label" for="{{ form.salary_min.id_for_label }}">{{ form.salary_min.label }}</label>
+    <select name="salary_min" id="{{ form.salary_min.id_for_label }}" class="select" data-default="0">
+      {% for value, label in form.fields.salary_min.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.salary_min.value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <label class="check check-sm">{{ form.salary_unknown }}<span>{{ form.salary_unknown.label }}</span></label>
+    <p class="field-help">Зарплату на DOU вказує лише частина вакансій.</p>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="{{ form.max_age_days.id_for_label }}">{{ form.max_age_days.label }}</label>
+    <select name="max_age_days" id="{{ form.max_age_days.id_for_label }}" class="select" data-default="0">
+      {% for value, label in form.fields.max_age_days.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.max_age_days.value|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <p class="field-help">{{ form.max_age_days.help_text }}</p>
+  </div>
 
   {% if subscription %}
   {% include "subscriptions/_save_status.html" %}

@@ -12,15 +12,22 @@ Rules:
   than regex \\b (which breaks on keywords that start or end with + . #);
 - at least one include keyword must match (if any are set);
 - none of the exclude keywords may match;
-- remote_only keeps only remote vacancies;
 - categories: the vacancy must be listed in at least one chosen category
-  (no categories chosen = all categories).
+  (no categories chosen = all categories);
+- where: "Віддалено" (remote_only) and cities are one choice with OR: remote
+  OR in one of the cities (nothing chosen = anywhere);
+- levels: the title must name one of them; a title without a level passes,
+  since "Python Developer" can be anything;
+- salary_min: the salary range must reach it; vacancies without a salary pass
+  only if salary_unknown (most DOU vacancies don't name one).
 """
 
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
+
+from .attributes import cities_of, levels_of, salary_reaches
 
 MAX_KEYWORDS = 15
 MAX_KEYWORD_LENGTH = 40
@@ -34,6 +41,10 @@ class Filters:
     exclude: tuple[str, ...] = ()
     categories: frozenset[str] = frozenset()
     remote_only: bool = False
+    cities: frozenset[str] = frozenset()
+    levels: frozenset[str] = frozenset()
+    salary_min: int = 0
+    salary_unknown: bool = True
 
     @classmethod
     def from_subscription(cls, subscription) -> "Filters":
@@ -42,6 +53,10 @@ class Filters:
             exclude=tuple(subscription.exclude_keywords or ()),
             categories=frozenset(subscription.categories or ()),
             remote_only=subscription.remote_only,
+            cities=frozenset(subscription.cities or ()),
+            levels=frozenset(subscription.levels or ()),
+            salary_min=subscription.salary_min or 0,
+            salary_unknown=subscription.salary_unknown,
         )
 
 
@@ -80,11 +95,21 @@ def matches(
     description: str,
     is_remote: bool,
     categories: Iterable[str],
+    location: str = "",
+    salary_text: str = "",
 ) -> bool:
-    if filters.remote_only and not is_remote:
-        return False
     if filters.categories and filters.categories.isdisjoint(categories):
         return False
+    if (filters.remote_only or filters.cities) and not _place_matches(filters, is_remote, location):
+        return False
+    if filters.levels:
+        levels = levels_of(title)
+        if levels and levels.isdisjoint(filters.levels):
+            return False
+    if filters.salary_min:
+        reaches = salary_reaches(salary_text, filters.salary_min)
+        if reaches is False or (reaches is None and not filters.salary_unknown):
+            return False
 
     text = f"{title}\n{description}"
     include = compile_keywords(filters.include)
@@ -96,6 +121,13 @@ def matches(
     return True
 
 
+def _place_matches(filters: Filters, is_remote: bool, location: str) -> bool:
+    if filters.remote_only and is_remote:
+        return True
+    wanted = {city.lower() for city in filters.cities}
+    return any(city.lower() in wanted for city in cities_of(location))
+
+
 def vacancy_matches(filters: Filters, vacancy) -> bool:
     """Adapter for Vacancy model instances (prefetch `sources` to avoid N+1)."""
     return matches(
@@ -104,6 +136,8 @@ def vacancy_matches(filters: Filters, vacancy) -> bool:
         description=vacancy.description_text,
         is_remote=vacancy.is_remote,
         categories=vacancy.categories,
+        location=vacancy.location,
+        salary_text=vacancy.salary_text,
     )
 
 

@@ -71,3 +71,21 @@ def test_fresh_feed_ignores_filters_and_is_limited(make_vacancy):
 
     assert len(fresh_feed(limit=10)) == 10
     assert all(v.is_active for v in fresh_feed(limit=20))
+
+
+def test_remote_or_city_is_not_narrowed_to_remote_in_sql(make_vacancy):
+    make_vacancy(title="Kyiv office", location="Київ")
+    make_vacancy(title="Remote", location="віддалено", is_remote=True)
+    make_vacancy(title="Kharkiv", location="Харків")
+
+    page = search(Filters(remote_only=True, cities=frozenset({"Київ"})))
+    assert sorted(v.title for v in page.vacancies) == ["Kyiv office", "Remote"]
+
+
+def test_popular_cities_most_common_first_without_remote(make_vacancy):
+    from radar.search import popular_cities
+
+    make_vacancy(title="A", location="Київ, Львів, віддалено")
+    make_vacancy(title="B", location="Львів")
+    make_vacancy(title="C", location="Одеса", is_active=False)  # closed: not counted
+    assert popular_cities() == ["Львів", "Київ"]

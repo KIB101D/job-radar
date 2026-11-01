@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "radar",
     "subscriptions",
+    "bot",
 ]
 
 MIDDLEWARE = [
@@ -117,7 +118,8 @@ if not DEBUG:
 # Public base URL of the site, used in bot messages ("Змінити фільтри" link).
 SITE_URL = env("SITE_URL", default="http://localhost:8000").rstrip("/")
 
-# Telegram (used from Phase 3 on).
+# Telegram bot. The webhook is SITE_URL + /telegram/webhook/; Telegram sends
+# TELEGRAM_WEBHOOK_SECRET in a header so we know the request is really from it.
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 TELEGRAM_BOT_USERNAME = env("TELEGRAM_BOT_USERNAME", default="")
 TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")

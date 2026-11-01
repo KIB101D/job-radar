@@ -414,8 +414,15 @@ def results(request, token: str):
     page = search(filters, offset=offset, limit=PAGE_SIZE)
     extra = {"append": offset > 0, "fragment": True}
     if offset == 0:
-        # Reloading the list resets the "Нові · N" counter to a fresh cursor.
-        extra.update(since_id=latest_vacancy_id(), new_count=0, last_fetched_at=last_fetched_at())
+        # Reloading the list resets the "Нові · N" counter to a fresh cursor, and
+        # the toast has done its job: the list now includes those vacancies.
+        extra.update(
+            since_id=latest_vacancy_id(),
+            new_count=0,
+            shown=0,
+            clear_toast=True,
+            last_fetched_at=last_fetched_at(),
+        )
     return render(
         request,
         "subscriptions/_results.html",
@@ -427,14 +434,19 @@ def results(request, token: str):
 def live(request, token: str):
     subscription = get_object_or_404(Subscription, token=token)
     since_id = _int_param(request, "since", default=latest_vacancy_id())
+    shown = _int_param(request, "shown", default=0)
     new = newer_than(Filters.from_subscription(subscription), since_id)
+    # Pop the toast only when a fetch brought MORE new matches than already
+    # announced; the same count must not pop up again every minute.
+    show_toast = settings.NEW_VACANCIES_TOAST and len(new) > shown
     context = {
         "subscription": subscription,
         "since_id": since_id,
         "new_count": len(new),
+        "shown": max(shown, len(new)),
         "newest": new[0] if new else None,
         "last_fetched_at": last_fetched_at(),
-        "toast_enabled": settings.NEW_VACANCIES_TOAST,
+        "show_toast": show_toast,
     }
     return render(request, "subscriptions/_live.html", context)
 

@@ -369,18 +369,49 @@ def test_live_stamp_before_any_fetch(client, subscription):
     assert "ще не оновлювалось" in html_of(client.get(url("live", subscription)))
 
 
-def test_toast_is_off_by_default_and_works_when_enabled(
-    client, subscription, make_vacancy, settings
-):
+def test_toast_pops_up_when_a_fetch_brings_new_matches(client, subscription, make_vacancy):
     old = make_vacancy(title="Python old")
+    live_url = url("live", subscription, f"?since={old.pk}&shown=0")
+    assert "data-toast" not in html_of(client.get(live_url))  # nothing new yet
+
     make_vacancy(title="Python brand new")
-    live_url = url("live", subscription, f"?since={old.pk}")
-
-    assert "data-toast" not in html_of(client.get(live_url))
-
-    settings.NEW_VACANCIES_TOAST = True
     html = html_of(client.get(live_url))
+
     assert "data-toast" in html and "1 нова вакансія" in html and "Python brand new" in html
+    assert f"since={old.pk}&amp;shown=1" in html  # the poller now remembers it was announced
+
+
+def test_toast_does_not_repeat_for_the_same_count(client, subscription, make_vacancy):
+    old = make_vacancy(title="Python old")
+    make_vacancy(title="Python new")
+
+    html = html_of(client.get(url("live", subscription, f"?since={old.pk}&shown=1")))
+
+    assert "data-toast" not in html
+    assert "Нові · 1" in html  # the tab still shows it
+
+
+def test_toast_comes_back_when_more_arrive(client, subscription, make_vacancy):
+    old = make_vacancy(title="Python old")
+    make_vacancy(title="Python new 1")
+    make_vacancy(title="Python new 2")
+
+    html = html_of(client.get(url("live", subscription, f"?since={old.pk}&shown=1")))
+
+    assert "2 нові вакансії" in html and "shown=2" in html
+
+
+def test_toast_can_be_switched_off(client, subscription, make_vacancy, settings):
+    settings.NEW_VACANCIES_TOAST = False
+    old = make_vacancy(title="Python old")
+    make_vacancy(title="Python new")
+    assert "data-toast" not in html_of(client.get(url("live", subscription, f"?since={old.pk}")))
+
+
+def test_reloading_the_list_clears_the_toast_and_resets_the_counter(client, subscription):
+    html = html_of(client.get(url("results", subscription)))
+    assert '<div id="toast-slot" hx-swap-oob="true"></div>' in html
+    assert "shown=0" in html
 
 
 def test_live_ignores_garbage_cursor(client, subscription):

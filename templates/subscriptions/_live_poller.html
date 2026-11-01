@@ -1,4 +1,8 @@
-<div id="live-poll"{% if oob %} hx-swap-oob="true"{% endif %} hidden
-     hx-get="{% url 'subscriptions:live' subscription.token %}?since={{ since_id }}"
+{% comment %}
+  The 60 s poll. `since` = newest vacancy id the list already shows; `shown` = how
+  many new matches the toast has already announced, so it only pops up again when
+  a later fetch brings more.
+{% endcomment %}<div id="live-poll"{% if oob %} hx-swap-oob="true"{% endif %} hidden
+     hx-get="{% url 'subscriptions:live' subscription.token %}?since={{ since_id }}&amp;shown={{ shown|default:0 }}"
      hx-trigger="every 60s[document.visibilityState === 'visible']"
      hx-swap="none"></div>

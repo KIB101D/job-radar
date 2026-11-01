@@ -124,9 +124,9 @@ TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 TELEGRAM_BOT_USERNAME = env("TELEGRAM_BOT_USERNAME", default="")
 TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")
 
-# The pop-up "N нових вакансій" toast (templates/components/toast.html) is built
-# but switched off for now; the "Нові · N" tab is the live indicator instead.
-NEW_VACANCIES_TOAST = env.bool("NEW_VACANCIES_TOAST", default=False)
+# Pop-up "N нових вакансій" toast on the radar page (templates/components/toast.html),
+# shown when a fetch brings new matches. Can be switched off with an env var.
+NEW_VACANCIES_TOAST = env.bool("NEW_VACANCIES_TOAST", default=True)
 
 # Polite fetching of RSS feeds.
 FETCH_USER_AGENT = env(

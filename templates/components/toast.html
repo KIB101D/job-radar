@@ -1,6 +1,6 @@
 {% load radar_ui %}{% comment %}
-  "N нових вакансій" pop-up from the design. Built and wired to the live poll
-  (subscriptions/_live.html), but switched off by settings.NEW_VACANCIES_TOAST.
+  "N нових вакансій" pop-up from the design, swapped in by the live poll
+  (subscriptions/_live.html). Switch off with settings.NEW_VACANCIES_TOAST.
 
   Params: subscription, count, newest (Vacancy, optional), oob (bool).
 {% endcomment %}<div id="toast-slot"{% if oob %} hx-swap-oob="true"{% endif %}>
@@ -17,8 +17,7 @@
       <div class="toast-actions">
         <button type="button" class="btn btn-primary btn-sm"
                 hx-get="{% url 'subscriptions:results' subscription.token %}"
-                hx-target="#results" hx-swap="outerHTML show:#matches:top"
-                data-toast-close>Показати</button>
+                hx-target="#results" hx-swap="outerHTML show:#matches:top">Показати</button>
         <button type="button" class="btn btn-ghost btn-sm" data-toast-close>Пізніше</button>
       </div>
     </div>

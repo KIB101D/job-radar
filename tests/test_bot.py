@@ -322,12 +322,13 @@ def test_site_link_is_a_button_on_https(send, linked, settings):
     assert f"https://radar.example.com/s/{linked.token}/" in urls
 
 
-def test_site_link_is_plain_text_on_localhost(send, linked, settings):
+def test_no_site_link_on_localhost(send, linked, settings):
+    """Telegram rejects localhost URL buttons, and a bare link adds nothing to the panel."""
     settings.SITE_URL = "http://localhost:8000"
     payload = send(message_update("/filters")).sent()[-1]
     buttons = [b for row in payload["reply_markup"]["inline_keyboard"] for b in row]
     assert not any("url" in b for b in buttons)
-    assert f"http://localhost:8000/s/{linked.token}/" in payload["text"]
+    assert "localhost" not in payload["text"]
 
 
 def test_help_and_unknown(send, linked):

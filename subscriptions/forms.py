@@ -57,7 +57,7 @@ class FiltersForm(forms.Form):
         ),
     )
     exclude_keywords = forms.CharField(
-        label="Виключити слова",
+        label="Виключені слова",
         help_text="Вакансії з цими словами не показуємо.",
         required=False,
         max_length=KEYWORDS_FIELD_MAX_LENGTH,

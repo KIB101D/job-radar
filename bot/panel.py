@@ -119,22 +119,14 @@ def _filters(subscription: Subscription, screen: str):
     )
     rows = [
         [
-            {
-                "text": texts.BTN_WORDS.format(count=len(subscription.include_keywords)),
-                "callback_data": "nav:words",
-            },
-            {
-                "text": texts.BTN_EXCLUDE.format(count=len(subscription.exclude_keywords)),
-                "callback_data": "nav:exclude",
-            },
+            {"text": texts.BTN_WORDS, "callback_data": "nav:words"},
+            {"text": texts.BTN_EXCLUDE, "callback_data": "nav:exclude"},
         ],
         [{"text": texts.BTN_CATEGORIES, "callback_data": "nav:cats"}, remote],
     ]
     url = radar_url(subscription)
-    if is_public_url(url):
+    if is_public_url(url):  # Telegram won't accept a localhost button in development
         rows.append([{"text": texts.BTN_SITE, "url": url}])
-    else:  # local development: Telegram won't accept a localhost button
-        text += "\n" + texts.PANEL_SITE.format(url=url)
     rows.append([CLOSE_BUTTON])
     return text, rows
 

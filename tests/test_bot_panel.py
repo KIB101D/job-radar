@@ -108,7 +108,10 @@ def test_filters_button_opens_filters_screen_directly(send, sub, make_vacancy):
 
     text = payload["text"]
     assert text.startswith("🔎 <b>Фільтри</b>")
-    assert "Слова: python" in text and "Без слів: senior" in text and "Категорії: Python" in text
+    assert "Ключові слова: python" in text and "Виключені слова: senior" in text
+    assert "Категорії: Python" in text
+    assert "Те саме на сайті" not in text
+    assert {"✏️ Ключові слова", "🚫 Виключені слова"} <= set(labels(payload))  # no counters
     assert "📊 Зараз збігів: <b>1</b>" in text
     assert buttons(payload)[-1]["callback_data"] == "close"
 
@@ -132,7 +135,7 @@ def test_reopening_replaces_the_old_panel_and_cleans_the_tap(send, sub, panel):
 def test_moving_between_screens_edits_the_same_message(send, sub, panel):
     tg = send(tap("nav:words", panel))
     assert last_edit(tg)["message_id"] == panel
-    assert "Слова для пошуку" in last_edit(tg)["text"]
+    assert "✏️ <b>Ключові слова</b>" in last_edit(tg)["text"]
 
     send(tap("nav:filters", panel))
     send(tap("nav:cats", panel))

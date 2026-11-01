@@ -1,5 +1,6 @@
 import secrets
 
+from django.core.validators import MaxValueValidator
 from django.db import models
 
 
@@ -9,11 +10,18 @@ def generate_token() -> str:
 
 
 class Frequency(models.TextChoices):
-    INSTANT = "instant", "Щойно з'являються"
+    """
+    How often digests go out. Slots are aligned to the clock in the user's
+    time zone and anchored at 09:00 (see subscriptions/schedule.py):
+    every 3 h = 09, 12, 15, 18, 21 (+ 00, 03, 06 unless quiet), daily = 09:00.
+    """
+
+    HOURLY = "hourly", "Щогодини"
     EVERY_3H = "every_3h", "Кожні 3 год"
-    TWICE_DAILY_9_18 = "twice_daily_9_18", "2 рази на день: 9:00 і 18:00"
-    DAILY_9 = "daily_9", "Раз на день о 9:00"
-    OFF = "off", "Не надсилати"
+    EVERY_6H = "every_6h", "Кожні 6 год"
+    EVERY_12H = "every_12h", "Кожні 12 год"
+    DAILY = "daily", "Раз на день"
+    OFF = "off", "Вимкнено"
 
 
 class Subscription(models.Model):
@@ -33,12 +41,15 @@ class Subscription(models.Model):
     remote_only = models.BooleanField(default=False)
 
     # Delivery settings.
-    frequency = models.CharField(
-        max_length=20, choices=Frequency.choices, default=Frequency.DAILY_9
-    )
+    frequency = models.CharField(max_length=20, choices=Frequency.choices, default=Frequency.DAILY)
     timezone = models.CharField(max_length=50, default="Europe/Kyiv")
-    quiet_hours_start = models.PositiveSmallIntegerField(default=22)
-    quiet_hours_end = models.PositiveSmallIntegerField(default=8)
+    quiet_hours_enabled = models.BooleanField(default=True)
+    quiet_hours_start = models.PositiveSmallIntegerField(
+        default=22, validators=[MaxValueValidator(23)]
+    )
+    quiet_hours_end = models.PositiveSmallIntegerField(
+        default=8, validators=[MaxValueValidator(23)]
+    )
     paused = models.BooleanField(default=False)
 
     # Bookkeeping.

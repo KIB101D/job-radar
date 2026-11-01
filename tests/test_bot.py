@@ -498,6 +498,15 @@ def test_stop_unlinks_and_removes_menu(send, linked):
     assert tg.sent()[-1]["reply_markup"] == {"remove_keyboard": True}
 
 
+def test_stop_also_deletes_the_settings_panel(send, linked):
+    from bot.models import ChatState
+
+    panel_id = send(message_update(texts.BTN_FILTERS_MENU))._next_id
+    tg = send(message_update("/stop"))
+    assert panel_id in [p["message_id"] for p in tg.sent("deleteMessage")]
+    assert ChatState.objects.get(chat_id=linked.chat_id).panel_message_id is None
+
+
 def test_blocking_the_bot_unlinks(send, linked):
     send(
         {

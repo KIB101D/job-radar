@@ -223,6 +223,7 @@ def send_help(chat_id: int) -> None:
 def stop(subscription: Subscription) -> None:
     chat_id = subscription.chat_id
     unlink_chat(chat_id)
+    panel.forget_panel(chat_id)  # its buttons would only answer "not linked" now
     get_client().send_message(chat_id, texts.STOPPED, keyboards.REMOVE_MENU)
 
 

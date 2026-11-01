@@ -631,11 +631,32 @@ def test_next_slot_preview_does_not_save(client, linked):
     assert linked.frequency == Frequency.DAILY
 
 
-def test_unlink(client, linked):
+def test_unlink(client, linked, tg):
     response = client.post(url("unlink", linked))
     linked.refresh_from_db()
     assert response["Location"] == url("radar_bot", linked)
     assert linked.chat_id is None and linked.linked_at is None
+
+
+def test_unlinking_on_the_site_tells_the_chat_and_removes_panel_and_menu(client, linked, tg):
+    from bot.models import ChatState
+
+    ChatState.objects.create(chat_id=42, panel_message_id=777, panel_screen="filters")
+
+    client.post(url("unlink", linked))
+
+    assert tg.sent("deleteMessage")[-1] == {"chat_id": 42, "message_id": 777}
+    message = tg.sent("sendMessage")[-1]
+    assert message["chat_id"] == 42 and "відключено від радару на сайті" in message["text"]
+    assert message["reply_markup"] == {"remove_keyboard": True}
+    assert ChatState.objects.get(chat_id=42).panel_message_id is None
+
+
+def test_unlink_works_even_if_telegram_fails(client, linked, tg):
+    tg.fail_next("sendMessage", 403, "Forbidden: bot was blocked by the user")
+    response = client.post(url("unlink", linked))
+    linked.refresh_from_db()
+    assert response.status_code == 302 and linked.chat_id is None
 
 
 # --- template helpers ----------------------------------------------------------------------

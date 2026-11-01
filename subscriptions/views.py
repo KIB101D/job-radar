@@ -589,9 +589,14 @@ def _current_card_values(subscription: Subscription) -> dict:
 @require_POST
 def unlink(request, token: str):
     subscription = get_object_or_404(Subscription, token=token)
+    chat_id = subscription.chat_id
     subscription.chat_id = None
     subscription.linked_at = None
     subscription.save(update_fields=["chat_id", "linked_at", "updated_at"])
+    if chat_id:
+        from bot.sync import notify_unlinked  # bot depends on this app, not vice versa
+
+        notify_unlinked(chat_id)
     messages.success(request, "Telegram відключено. Фільтри на сайті лишились як були.")
     return redirect("subscriptions:radar_bot", token)
 

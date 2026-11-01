@@ -354,6 +354,27 @@ def refresh_panel(subscription: Subscription) -> bool:
     return True
 
 
+def forget_panel(chat_id: int) -> None:
+    """The chat is no longer linked: delete its settings panel, if there is one."""
+    state = ChatState.objects.filter(chat_id=chat_id).first()
+    if state and state.panel_message_id:
+        _delete_quietly(chat_id, state.panel_message_id)
+        state.panel_message_id = None
+        state.save()
+
+
+def say_unlinked(chat_id: int) -> None:
+    """
+    Unlinked on the website: tell the chat, take away the panel and the menu, so
+    Telegram doesn't keep looking connected. Best effort: never raises.
+    """
+    forget_panel(chat_id)
+    try:
+        get_client().send_message(chat_id, texts.UNLINKED_ON_SITE, {"remove_keyboard": True})
+    except TelegramError:
+        pass  # the user blocked the bot, Telegram is down...: the unlink itself stands
+
+
 def close_panel(subscription: Subscription, message_id: int) -> None:
     _delete_quietly(subscription.chat_id, message_id)
     ChatState.objects.filter(chat_id=subscription.chat_id, panel_message_id=message_id).update(

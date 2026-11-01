@@ -9,10 +9,12 @@ carried by text formatting, emoji and plain keyboard buttons.
 
 BTN_CHECK = "🔄 Перевірити зараз"
 BTN_LATEST = "🗂 Останні 10"
-BTN_SETTINGS = "⚙️ Налаштування"
+BTN_FILTERS_MENU = "🔎 Фільтри"
+BTN_NOTIFY_MENU = "⏰ Сповіщення"
 BTN_PAUSE = "⏸ Пауза"
 BTN_RESUME = "▶️ Відновити"
-# Buttons of the previous menu: chats may still show them until the menu refreshes.
+# Buttons of earlier menus: chats may still show them until the menu refreshes.
+BTN_SETTINGS = "⚙️ Налаштування"
 BTN_FREQUENCY = "⏰ Частота"
 BTN_FILTERS = "⚙️ Змінити фільтри"
 MENU_PLACEHOLDER = "Обери дію в меню"
@@ -22,8 +24,7 @@ MENU_PLACEHOLDER = "Обери дію в меню"
 COMMANDS = [
     ("check", "Перевірити нові вакансії зараз"),
     ("latest", "Останні 10 збігів"),
-    ("settings", "Фільтри і сповіщення"),
-    ("filters", "Змінити фільтри пошуку"),
+    ("filters", "Фільтри пошуку"),
     ("frequency", "Як часто надсилати нове"),
     ("pause", "Пауза або відновити сповіщення"),
     ("help", "Що вміє бот"),
@@ -36,7 +37,7 @@ WELCOME = (
     "👋 <b>Радар підключено!</b>\n"
     "Шукаю за фільтрами з сайту: {filters}.\n\n"
     "Меню внизу: перевірити нове вручну, подивитись останні 10, змінити фільтри "
-    "й частоту в «Налаштуваннях» або поставити сповіщення на паузу."
+    "чи частоту сповіщень або поставити їх на паузу."
 )
 WELCOME_BACK = "👋 <b>Ти вже підключений.</b>\nШукаю за фільтрами: {filters}."
 START_NO_TOKEN = (
@@ -106,11 +107,7 @@ RESUMED = "▶️ <b>Сповіщення відновлено.</b>"
 
 # --- Settings panel (one message, edited in place) ---------------------------------------------
 
-PANEL_TITLE = "⚙️ <b>Налаштування радару</b>"
-PANEL_FILTERS = "🔎 <b>Фільтри</b> · зараз збігів: <b>{count}</b>"
-PANEL_NOTIFY = "⏰ <b>Сповіщення</b>"
 PANEL_SITE = "🌐 Те саме на сайті: {url}"
-PANEL_PAUSED = "⏸ На паузі: натисни «{button}» у меню."
 
 LINE_WORDS = "✏️ Слова: {value}"
 LINE_EXCLUDE = "🚫 Без слів: {value}"
@@ -134,11 +131,8 @@ ADD_HINT = "➕ Щоб додати, напиши в чат, можна кіль
 CATEGORIES_TITLE = "📂 <b>Категорії DOU</b>"
 CATEGORIES_HELP = "Натисни, щоб увімкнути чи вимкнути. Якщо нічого не вибрано, шукаю в усіх."
 
-BTN_FILTERS_SECTION = "🔎 Фільтри"
-BTN_NOTIFY_SECTION = "⏰ Сповіщення"
 BTN_SITE = "🌐 Відкрити на сайті"
 BTN_CLOSE = "✖️ Закрити"
-BTN_BACK = "← Назад"
 BTN_BACK_FILTERS = "← До фільтрів"
 BTN_WORDS = "✏️ Слова · {count}"
 BTN_EXCLUDE = "🚫 Без слів · {count}"
@@ -162,7 +156,8 @@ HELP = (
     "🔄 <b>Перевірити зараз</b>: нові вакансії, яких ти ще не бачив "
     "(не частіше ніж раз на хвилину)\n"
     "🗂 <b>Останні 10</b>: найсвіжіші збіги за фільтрами\n"
-    "⚙️ <b>Налаштування</b>: фільтри пошуку, частота й тихі години, в одному вікні\n"
+    "🔎 <b>Фільтри</b>: слова, виключення, категорії, віддалена робота\n"
+    "⏰ <b>Сповіщення</b>: як часто надсилати нове і тихі години\n"
     "⏸ <b>Пауза</b>: тимчасово не надсилати сповіщення\n\n"
     "/stop відключає бота від радару."
 )

@@ -156,8 +156,8 @@ def test_start_with_token_links_chat_and_sends_welcome_batch_and_frequency(send,
     assert batch["parse_mode"] == "HTML"
     assert "Як часто надсилати нове?" in frequency["text"]
     rows = frequency["reply_markup"]["inline_keyboard"]
-    assert len(rows) == 5  # 3 rows of 2 + quiet hours + back to the panel
-    assert rows[-1][0]["callback_data"] == "nav:main"
+    assert len(rows) == 5  # 3 rows of 2 + quiet hours + close
+    assert rows[-1][0]["callback_data"] == "close"
     assert Delivery.objects.filter(subscription=sub).count() == 5
 
 
@@ -317,14 +317,14 @@ def test_vacancy_html_is_escaped(send, linked, make_vacancy):
 
 def test_site_link_is_a_button_on_https(send, linked, settings):
     settings.SITE_URL = "https://radar.example.com"
-    payload = send(message_update(texts.BTN_SETTINGS)).sent()[-1]
+    payload = send(message_update(texts.BTN_FILTERS_MENU)).sent()[-1]
     urls = [b.get("url") for row in payload["reply_markup"]["inline_keyboard"] for b in row]
     assert f"https://radar.example.com/s/{linked.token}/" in urls
 
 
 def test_site_link_is_plain_text_on_localhost(send, linked, settings):
     settings.SITE_URL = "http://localhost:8000"
-    payload = send(message_update("/settings")).sent()[-1]
+    payload = send(message_update("/filters")).sent()[-1]
     buttons = [b for row in payload["reply_markup"]["inline_keyboard"] for b in row]
     assert not any("url" in b for b in buttons)
     assert f"http://localhost:8000/s/{linked.token}/" in payload["text"]
@@ -451,7 +451,7 @@ def test_pause_and_resume_swap_the_menu_button(send, linked):
     tg = send(message_update(texts.BTN_PAUSE))
     linked.refresh_from_db()
     assert linked.paused is True
-    assert tg.sent()[-1]["reply_markup"]["keyboard"][1][1]["text"] == texts.BTN_RESUME
+    assert tg.sent()[-1]["reply_markup"]["keyboard"][2][0]["text"] == texts.BTN_RESUME
 
     tg = send(message_update(texts.BTN_RESUME))
     linked.refresh_from_db()

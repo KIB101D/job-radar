@@ -1,14 +1,15 @@
 """
 The settings panel: ONE Telegram message with inline buttons, edited in place.
 
-Screens (ChatState.panel_screen):
+Screens (ChatState.panel_screen). Each menu button opens its own top screen
+directly, without a summary screen in between:
 
-    main ──┬── filters ──┬── words     (include keywords)
-           │             ├── exclude   (exclude keywords)
-           │             └── cats      (DOU categories)
-           └── freq                    (frequency + quiet hours)
+    🔎 Фільтри    filters ──┬── words     (include keywords)
+                           ├── exclude   (exclude keywords)
+                           └── cats      (DOU categories)
+    ⏰ Сповіщення  freq                    (frequency + quiet hours)
 
-Opening the panel again (menu button, /settings, /filters, /frequency) deletes
+Opening the panel again (menu button, /filters, /frequency) deletes
 the old panel and sends a fresh one at the bottom of the chat, so there's only
 ever one. Lists of vacancies, pause and digests stay separate messages: those
 are events worth keeping in the history.
@@ -33,7 +34,9 @@ from .formatting import is_public_url, radar_url
 from .models import ChatState
 from .telegram import TelegramError, get_client
 
-SCREENS = ("main", "filters", "words", "exclude", "cats", "freq")
+SCREENS = ("filters", "words", "exclude", "cats", "freq")
+# The summary screen was removed; buttons in older panels still say "nav:main".
+SCREEN_ALIASES = {"main": "filters"}
 WORD_LISTS = {"words": "include_keywords", "exclude": "exclude_keywords"}
 LIST_CODES = {"inc": "words", "exc": "exclude"}  # short codes for callback_data (64 bytes max)
 CODE_OF = {v: k for k, v in LIST_CODES.items()}
@@ -50,6 +53,9 @@ GONE = (
 
 def _gone(exc: TelegramError) -> bool:
     return any(marker in exc.description.lower() for marker in GONE)
+
+
+CLOSE_BUTTON = {"text": texts.BTN_CLOSE, "callback_data": "close"}
 
 
 def fingerprint(word: str) -> str:
@@ -69,14 +75,14 @@ def state_for(chat_id: int) -> ChatState:
 
 
 def render(subscription: Subscription, screen: str, note: str = "") -> tuple[str, dict]:
+    screen = SCREEN_ALIASES.get(screen, screen)
     builder = {
-        "main": _main,
         "filters": _filters,
         "words": _words,
         "exclude": _words,
         "cats": _categories,
         "freq": _frequency,
-    }.get(screen, _main)
+    }.get(screen, _filters)
     text, rows = builder(subscription, screen)
     if note:
         text += "\n\n" + note
@@ -95,48 +101,6 @@ def _filter_lines(subscription: Subscription) -> list[str]:
         ),
         texts.LINE_REMOTE.format(value=texts.YES if subscription.remote_only else texts.NO),
     ]
-
-
-def notify_summary(subscription: Subscription) -> list[str]:
-    when = schedule.next_slot_label(subscription)
-    first = subscription.get_frequency_display()
-    if when and not subscription.paused:
-        first += f" · наступне {when} ({schedule.timezone_label(subscription)})"
-    lines = [first]
-    if subscription.frequency != Frequency.OFF and subscription.quiet_hours_enabled:
-        lines.append(
-            f"🌙 Тихі години {subscription.quiet_hours_start:02d}:00–"
-            f"{subscription.quiet_hours_end:02d}:00"
-        )
-    if subscription.paused:
-        lines.append(texts.PANEL_PAUSED.format(button=texts.BTN_RESUME))
-    return lines
-
-
-def _main(subscription: Subscription, screen: str):
-    url = radar_url(subscription)
-    parts = [
-        texts.PANEL_TITLE,
-        "\n".join(
-            [
-                texts.PANEL_FILTERS.format(count=match_count(subscription)),
-                *_filter_lines(subscription),
-            ]
-        ),
-        "\n".join([texts.PANEL_NOTIFY, *notify_summary(subscription)]),
-    ]
-    rows = [
-        [
-            {"text": texts.BTN_FILTERS_SECTION, "callback_data": "nav:filters"},
-            {"text": texts.BTN_NOTIFY_SECTION, "callback_data": "nav:freq"},
-        ]
-    ]
-    if is_public_url(url):
-        rows.append([{"text": texts.BTN_SITE, "url": url}])
-    else:  # local development: Telegram won't accept a localhost button
-        parts.append(texts.PANEL_SITE.format(url=url))
-    rows.append([{"text": texts.BTN_CLOSE, "callback_data": "close"}])
-    return "\n\n".join(parts), rows
 
 
 def _filters(subscription: Subscription, screen: str):
@@ -165,8 +129,13 @@ def _filters(subscription: Subscription, screen: str):
             },
         ],
         [{"text": texts.BTN_CATEGORIES, "callback_data": "nav:cats"}, remote],
-        [{"text": texts.BTN_BACK, "callback_data": "nav:main"}],
     ]
+    url = radar_url(subscription)
+    if is_public_url(url):
+        rows.append([{"text": texts.BTN_SITE, "url": url}])
+    else:  # local development: Telegram won't accept a localhost button
+        text += "\n" + texts.PANEL_SITE.format(url=url)
+    rows.append([CLOSE_BUTTON])
     return text, rows
 
 
@@ -266,14 +235,14 @@ def _frequency(subscription: Subscription, screen: str):
         rows.append([{"text": texts.QUIET_BUTTON_ON, "callback_data": "quiet:off"}])
     else:
         rows.append([{"text": texts.QUIET_BUTTON_OFF, "callback_data": "quiet:on"}])
-    rows.append([{"text": texts.BTN_BACK, "callback_data": "nav:main"}])
+    rows.append([CLOSE_BUTTON])
     return frequency_text(subscription), rows
 
 
 # --- showing the panel ----------------------------------------------------------------------------
 
 
-def open_panel(subscription: Subscription, screen: str = "main", *, tap_message_id=None) -> None:
+def open_panel(subscription: Subscription, screen: str, *, tap_message_id=None) -> None:
     """Replace the chat's panel with a fresh one at the bottom of the chat."""
     client = get_client()
     chat_id = subscription.chat_id
@@ -414,8 +383,8 @@ def handle_callback(subscription: Subscription, data: str, message_id: int) -> s
     """
     kind, _, value = data.partition(":")
     note = ""
-    if kind == "nav" and value in SCREENS:
-        screen = value
+    if kind == "nav" and (value in SCREENS or value in SCREEN_ALIASES):
+        screen = SCREEN_ALIASES.get(value, value)
     elif kind == "close":
         close_panel(subscription, message_id)
         return ""

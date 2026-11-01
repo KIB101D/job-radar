@@ -70,7 +70,7 @@ def sub():
 @pytest.fixture
 def panel(send, sub):
     """Open the panel; returns its message id."""
-    tg = send(msg(texts.BTN_SETTINGS))
+    tg = send(msg(texts.BTN_FILTERS_MENU))
     return tg._next_id
 
 
@@ -93,47 +93,58 @@ def state() -> ChatState:
 # --- one window ------------------------------------------------------------------------------
 
 
-def test_menu_has_settings_instead_of_separate_buttons(send, sub):
+def test_menu_has_direct_filters_and_notifications_buttons(send, sub):
     keyboard = send(msg("/help")).sent()[-1]["reply_markup"]["keyboard"]
     assert keyboard == [
         [{"text": texts.BTN_CHECK}, {"text": texts.BTN_LATEST}],
-        [{"text": texts.BTN_SETTINGS}, {"text": texts.BTN_PAUSE}],
+        [{"text": texts.BTN_FILTERS_MENU}, {"text": texts.BTN_NOTIFY_MENU}],
+        [{"text": texts.BTN_PAUSE}],
     ]
 
 
-def test_settings_opens_main_screen_with_summary(send, sub, make_vacancy):
+def test_filters_button_opens_filters_screen_directly(send, sub, make_vacancy):
     make_vacancy(title="Python dev")
-    payload = send(msg(texts.BTN_SETTINGS)).sent()[-1]
+    payload = send(msg(texts.BTN_FILTERS_MENU)).sent()[-1]
 
     text = payload["text"]
-    assert "Налаштування радару" in text
+    assert text.startswith("🔎 <b>Фільтри</b>")
     assert "Слова: python" in text and "Без слів: senior" in text and "Категорії: Python" in text
-    assert "зараз збігів: <b>1</b>" in text
-    assert "Кожні 3 год" in text
-    assert [b.get("callback_data") for b in buttons(payload)][:2] == ["nav:filters", "nav:freq"]
+    assert "📊 Зараз збігів: <b>1</b>" in text
+    assert buttons(payload)[-1]["callback_data"] == "close"
+
+
+def test_notifications_button_opens_frequency_screen_directly(send, sub):
+    payload = send(msg(texts.BTN_NOTIFY_MENU)).sent()[-1]
+    assert payload["text"].startswith("⏰ <b>Як часто надсилати нове?</b>")
+    assert "✅ Кожні 3 год" in labels(payload)
+    assert buttons(payload)[-1]["callback_data"] == "close"
 
 
 def test_reopening_replaces_the_old_panel_and_cleans_the_tap(send, sub, panel):
-    tg = send(msg(texts.BTN_SETTINGS, message_id=321))
+    tg = send(msg(texts.BTN_FILTERS_MENU, message_id=321))
 
     deleted = [p["message_id"] for p in tg.sent("deleteMessage")]
     assert panel in deleted  # the previous panel
-    assert 321 in deleted  # the "⚙️ Налаштування" tap itself
+    assert 321 in deleted  # the "🔎 Фільтри" tap itself
     assert state().panel_message_id == tg._next_id
 
 
 def test_moving_between_screens_edits_the_same_message(send, sub, panel):
-    tg = send(tap("nav:filters", panel))
-    assert last_edit(tg)["message_id"] == panel and "🔎 <b>Фільтри</b>" in last_edit(tg)["text"]
-
-    send(tap("nav:words", panel))
+    tg = send(tap("nav:words", panel))
+    assert last_edit(tg)["message_id"] == panel
     assert "Слова для пошуку" in last_edit(tg)["text"]
 
     send(tap("nav:filters", panel))
-    send(tap("nav:main", panel))
-    assert "Налаштування радару" in last_edit(tg)["text"]
-    assert tg.sent("sendMessage")[-1]["text"].startswith("⚙️")  # no extra messages sent
-    assert state().panel_screen == "main"
+    send(tap("nav:cats", panel))
+    send(tap("nav:filters", panel))
+    assert last_edit(tg)["text"].startswith("🔎 <b>Фільтри</b>")
+    assert len(tg.sent("sendMessage")) == 1  # only the panel itself, no extra messages
+    assert state().panel_screen == "filters"
+
+
+def test_back_button_of_an_old_summary_panel_still_works(send, sub, panel):
+    tg = send(tap("nav:main", panel))
+    assert last_edit(tg)["text"].startswith("🔎 <b>Фільтри</b>")
 
 
 def test_close_deletes_the_panel(send, sub, panel):
@@ -153,14 +164,18 @@ def test_commands_open_the_right_screen(send, sub):
     assert "Як часто надсилати нове?" in send(msg("/frequency")).sent()[-1]["text"]
 
 
-def test_buttons_of_the_old_menu_still_work(send, sub):
+def test_buttons_of_older_menus_still_work(send, sub):
     assert "🔎 <b>Фільтри</b>" in send(msg(texts.BTN_FILTERS)).sent()[-1]["text"]
+    assert "🔎 <b>Фільтри</b>" in send(msg(texts.BTN_SETTINGS)).sent()[-1]["text"]
+    assert "Як часто" in send(msg(texts.BTN_FREQUENCY)).sent()[-1]["text"]
 
 
-def test_pause_is_a_new_message_and_updates_the_panel(send, sub, panel):
+def test_pause_is_a_new_message_and_updates_the_notifications_panel(send, sub):
+    panel_id = send(msg(texts.BTN_NOTIFY_MENU))._next_id
     tg = send(msg(texts.BTN_PAUSE))
     assert "Сповіщення на паузі" in tg.sent("sendMessage")[-1]["text"]
-    assert "На паузі" in last_edit(tg)["text"] and last_edit(tg)["message_id"] == panel
+    assert last_edit(tg)["message_id"] == panel_id
+    assert "Сповіщення на паузі" in last_edit(tg)["text"]
 
 
 # --- words -------------------------------------------------------------------------------------

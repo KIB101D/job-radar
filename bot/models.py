@@ -39,7 +39,7 @@ class ChatState(models.Model):
 
     chat_id = models.BigIntegerField(primary_key=True)
     panel_message_id = models.BigIntegerField(null=True, blank=True)
-    panel_screen = models.CharField(max_length=20, default="main")
+    panel_screen = models.CharField(max_length=20, default="filters")
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:

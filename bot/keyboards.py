@@ -9,7 +9,8 @@ def main_menu(subscription) -> dict:
     return {
         "keyboard": [
             [{"text": texts.BTN_CHECK}, {"text": texts.BTN_LATEST}],
-            [{"text": texts.BTN_SETTINGS}, {"text": pause}],
+            [{"text": texts.BTN_FILTERS_MENU}, {"text": texts.BTN_NOTIFY_MENU}],
+            [{"text": pause}],
         ],
         "resize_keyboard": True,
         "is_persistent": True,

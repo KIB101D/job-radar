@@ -231,11 +231,13 @@ ACTIONS = {
     texts.BTN_CHECK: do_check,
     "/latest": do_latest,
     texts.BTN_LATEST: do_latest,
-    "/settings": open_screen("main"),
-    texts.BTN_SETTINGS: open_screen("main"),
     "/filters": open_screen("filters"),
+    texts.BTN_FILTERS_MENU: open_screen("filters"),
     "/frequency": open_screen("freq"),
-    # Buttons of the previous menu, still on screen in chats linked before it changed.
+    texts.BTN_NOTIFY_MENU: open_screen("freq"),
+    # Buttons of earlier menus, still on screen in chats until the menu refreshes.
+    "/settings": open_screen("filters"),
+    texts.BTN_SETTINGS: open_screen("filters"),
     texts.BTN_FILTERS: open_screen("filters"),
     texts.BTN_FREQUENCY: open_screen("freq"),
     # Menu buttons are explicit, so an outdated keyboard can't do the opposite.

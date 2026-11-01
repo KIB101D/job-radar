@@ -275,8 +275,21 @@ a.how-card-accent:hover { border-color: var(--lime-border-strong); }
 }
 .filters input[type="text"]::placeholder { color: var(--faint); }
 .filters input[type="text"]:focus, .select:focus { outline: 2px solid var(--lime); outline-offset: 0; border-color: transparent; }
-.select { width: auto; padding: 0 10px; }
-.select-sm { height: 36px; font-size: 13px; }
+/* Own chevron instead of the browser's: the native arrow sits against the edge on macOS. */
+.select {
+  width: auto;
+  padding: 0 40px 0 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23aeb8c4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
+  cursor: pointer;
+}
+.select:hover { border-color: var(--border-btn); }
+.select-sm { height: 36px; font-size: 13px; padding: 0 34px 0 12px; background-position: right 12px center; }
+.select option { background: var(--panel); color: var(--text); }
 
 /* Keyword chips (enhanced by app.js) */
 .chips-list { display: flex; flex-wrap: wrap; gap: 8px; }

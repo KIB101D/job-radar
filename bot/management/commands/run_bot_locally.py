@@ -17,6 +17,11 @@ from bot.handlers import safe_handle_update
 from bot.management.commands.set_telegram_webhook import ALLOWED_UPDATES
 from bot.telegram import TelegramError, get_client
 
+# A held-open long poll that drops (flaky Wi-Fi, laptop sleep) ends with one of
+# these. Retried quietly after a short pause. Being offline (ConnectError) is
+# still reported, with a longer pause, so it can't turn into a busy loop.
+IDLE_NETWORK_ERRORS = {"ReadTimeout", "ReadError", "RemoteProtocolError"}
+
 
 class Command(BaseCommand):
     help = "DEV ONLY: run the bot with long polling instead of the webhook."
@@ -49,6 +54,9 @@ class Command(BaseCommand):
             try:
                 updates = client.get_updates(offset, ALLOWED_UPDATES)
             except TelegramError as exc:
+                if exc.description in IDLE_NETWORK_ERRORS:
+                    time.sleep(1)
+                    continue
                 self.stderr.write(f"getUpdates failed: {exc}; retrying in 5 s")
                 time.sleep(5)
                 continue

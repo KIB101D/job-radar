@@ -521,3 +521,34 @@ def test_run_bot_locally_handles_updates_with_same_handlers(tg, sub):
     sub.refresh_from_db()
     assert tg.sent("deleteWebhook")
     assert sub.chat_id == CHAT
+
+
+def test_run_bot_locally_retries_idle_timeouts_quietly(tg, monkeypatch, capsys):
+    from django.core.management import call_command
+
+    from bot.management.commands import run_bot_locally
+
+    sleeps = []
+    monkeypatch.setattr(run_bot_locally.time, "sleep", sleeps.append)
+    tg.fail_next("getUpdates", None, "ReadTimeout")
+
+    call_command("run_bot_locally", once=True)
+
+    assert len(tg.sent("getUpdates")) == 2  # failed once, asked again
+    assert sleeps == [1]
+    assert "failed" not in capsys.readouterr().err
+
+
+def test_run_bot_locally_reports_being_offline(tg, monkeypatch, capsys):
+    from django.core.management import call_command
+
+    from bot.management.commands import run_bot_locally
+
+    sleeps = []
+    monkeypatch.setattr(run_bot_locally.time, "sleep", sleeps.append)
+    tg.fail_next("getUpdates", None, "ConnectError")
+
+    call_command("run_bot_locally", once=True)
+
+    assert sleeps == [5]
+    assert "getUpdates failed" in capsys.readouterr().err

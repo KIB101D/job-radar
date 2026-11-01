@@ -1,0 +1,28 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+# The database is Neon (DATABASE_URL), the scheduled jobs are GitHub Actions
+# (.github/workflows), so this is a single free web service. See docs/deploy.md.
+services:
+  - type: web
+    name: job-radar
+    runtime: python
+    plan: free
+    region: frankfurt  # next to Neon's eu-central-1 (Frankfurt)
+    buildCommand: ./bin/build.sh
+    startCommand: gunicorn config.wsgi:application --workers 2 --timeout 60 --access-logfile -
+    healthCheckPath: /healthz/
+    autoDeploy: true
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL  # Neon connection string, ?sslmode=require
+        sync: false
+      - key: SITE_URL  # https://<service>.onrender.com, no trailing slash
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET  # letters, digits, _ and - only
+        sync: false

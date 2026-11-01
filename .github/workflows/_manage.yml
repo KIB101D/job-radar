@@ -1,0 +1,53 @@
+# Reusable: run one management command against the production database (Neon).
+# The scheduled workflows below call it; the site on Render never scrapes or
+# sends digests itself.
+name: manage.py
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        required: true
+        type: string
+      timeout:
+        required: false
+        type: number
+        default: 10
+    secrets:
+      DATABASE_URL:
+        required: true
+      SECRET_KEY:
+        required: true
+      SITE_URL:
+        required: false
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      TELEGRAM_BOT_USERNAME:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    # Forks have no secrets and shouldn't hit DOU or Telegram on a schedule.
+    if: github.repository_owner == 'KIB101D'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python manage.py ${{ inputs.command }}
+        env:
+          DEBUG: "False"
+          DB_CONN_MAX_AGE: "0"  # a short job: no persistent connections
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_USERNAME: ${{ secrets.TELEGRAM_BOT_USERNAME }}

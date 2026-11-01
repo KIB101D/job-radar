@@ -1,0 +1,18 @@
+name: Check closed vacancies
+
+on:
+  schedule:
+    - cron: "23 3 * * *"  # daily, 03:23 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: check-active
+  cancel-in-progress: false
+
+jobs:
+  check:
+    uses: ./.github/workflows/_manage.yml
+    with:
+      command: check_active
+      timeout: 30  # up to 300 pages at 1.5 s apart
+    secrets: inherit

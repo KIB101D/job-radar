@@ -1,0 +1,21 @@
+name: Send digests
+
+on:
+  schedule:
+    # Every 30 min (UTC), a few minutes after fetch-vacancies (:07/:37): the digest
+    # gets the freshest vacancies and Neon is usually still awake from the fetch,
+    # so the database wakes up once per half hour instead of twice. Slots are at
+    # least an hour apart, so a digest is at most ~30 min late.
+    - cron: "10,40 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: send-digests
+  cancel-in-progress: false
+
+jobs:
+  digests:
+    uses: ./.github/workflows/_manage.yml
+    with:
+      command: send_digests
+    secrets: inherit

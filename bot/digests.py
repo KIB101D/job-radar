@@ -2,7 +2,8 @@
 Scheduled digests: one Telegram message per subscription with the matches it
 hasn't seen, sent when its clock-aligned slot comes (subscriptions/schedule.py).
 
-Run by `send_digests` every 15 minutes. Safe to run late, twice or in parallel:
+Run by `send_digests` every 30 minutes, right after the fetch. Safe to run late,
+twice or in parallel:
 - a slot is claimed with one conditional UPDATE on last_digest_at, so two runs
   can't both send the same digest;
 - if sending fails, the claim is rolled back and the next run tries again;

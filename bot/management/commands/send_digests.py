@@ -11,7 +11,7 @@ DIGEST_LOCK_TTL = timedelta(minutes=10)
 
 
 class Command(BaseCommand):
-    help = "Send due Telegram digests. Run by cron every 15 min."
+    help = "Send due Telegram digests. Run by cron every 30 min, after the fetch."
 
     def handle(self, *args, **options):
         if not settings.TELEGRAM_BOT_TOKEN:

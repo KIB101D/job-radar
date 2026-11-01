@@ -3,12 +3,13 @@
   - not linked: what happens after Start + a button to the connect step;
   - linked: frequency and quiet hours, auto-saved on change (HTMX), next slot.
   Params: subscription, notifications_form, bot_username, deep_link, next_slot, tz_label, saved.
-  The card re-reads itself from the database when the tab becomes visible again,
-  and each change saves only the field that changed (see views.notifications),
-  so a tab left open while you used the bot can't overwrite the bot's changes.
+  The card checks the database every few seconds while visible and nobody is
+  using it, and on window focus (204 while `version` is unchanged), so changes
+  made in the bot appear on their own. Each change here saves only the field that
+  changed (see views.notifications), so a stale tab can't overwrite the bot's.
 {% endcomment %}<div id="bot-card" class="panel bot-card"
-     hx-get="{% url 'subscriptions:notifications' subscription.token %}"
-     hx-trigger="visibilitychange[document.visibilityState === 'visible'] from:document"
+     hx-get="{% url 'subscriptions:notifications' subscription.token %}?v={{ version }}"
+     hx-trigger="every 5s[document.visibilityState === 'visible' && !document.getElementById('bot-card')?.contains(document.activeElement)], focus from:window, visibilitychange[document.visibilityState === 'visible'] from:document"
      hx-swap="outerHTML">
 {% if subscription.is_linked %}
   <div class="bot-card-head">

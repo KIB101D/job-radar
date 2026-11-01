@@ -372,6 +372,7 @@ def radar_bot(request, token: str):
 
 def _bot_context(subscription: Subscription) -> dict:
     return {
+        "version": _version(subscription),
         "bot_username": _bot_username(),
         "deep_link": _deep_link(subscription),
         "next_slot": schedule.next_slot_label(subscription),
@@ -438,8 +439,8 @@ def notifications(request, token: str):
     """
     Bot settings card on the radar's Telegram page (HTMX).
 
-    GET re-renders it from the database, so a tab you return to (say, after
-    changing the frequency in the bot) shows current values.
+    GET re-renders it from the database, so changes made in the bot show up here
+    within seconds; 204 when the card's version (`v`) is still current.
 
     POST auto-saves ONE field: the one the user just changed (`changed`, sent by
     the page). Every other field is taken from the database, not from the page.
@@ -447,6 +448,8 @@ def notifications(request, token: str):
     hours there would also revert a frequency just chosen in the bot.
     """
     subscription = get_object_or_404(Subscription, token=token)
+    if request.method == "GET" and request.GET.get("v") == _version(subscription):
+        return HttpResponse(status=204)
     saved = False
     form = NotificationsForm(instance=subscription)
     if request.method == "POST":
@@ -526,7 +529,9 @@ def _autosave_filters(request, subscription: Subscription):
 def _render_results(request, subscription, *, view, offset=0, **extra):
     filters = Filters.from_subscription(subscription)
     page = _search(subscription, filters, view=view, offset=offset)
-    extra.update(view=view, append=offset > 0, fragment=True)
+    # `version` refreshes the change watcher (_filters_sync.html), so a save made
+    # on this page isn't mistaken for a change made in the bot.
+    extra.update(view=view, append=offset > 0, fragment=True, version=_version(subscription))
     if offset == 0:
         # Reloading the list resets the toast's "since" cursor, and the toast has
         # done its job: the list now includes those vacancies.
@@ -546,9 +551,9 @@ def _render_results(request, subscription, *, view, offset=0, **extra):
 @require_GET
 def filters_form(request, token: str):
     """
-    The filters card again, from the database, plus fresh matches. Requested when
-    the tab becomes visible (say, after editing words in the bot); 204 when
-    nothing was saved since the page was drawn.
+    The filters card again, from the database, plus fresh matches. Requested by
+    _filters_sync.html every few seconds and on focus (say, after editing words in
+    the bot); 204 when nothing was saved since the page last drew it.
     """
     subscription = get_object_or_404(Subscription, token=token)
     version = _version(subscription)

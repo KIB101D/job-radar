@@ -1,0 +1,11 @@
+{% comment %}
+  Picks up changes made elsewhere (the bot, another tab): every few seconds while
+  the page is visible and nobody is typing in the filters, and right away when the
+  window gets focus or the tab becomes visible again. views.filters_form answers
+  204 while the radar's version is unchanged, so an idle check costs one small query.
+  Every save made on this page sends a fresh copy of this element (out of band),
+  so the page's own edits never trigger a redraw. Params: subscription, version, oob.
+{% endcomment %}<div id="filters-sync" hidden{% if oob %} hx-swap-oob="true"{% endif %}
+     hx-get="{% url 'subscriptions:filters_form' subscription.token %}?v={{ version }}"
+     hx-trigger="every 5s[document.visibilityState === 'visible' && !document.getElementById('filters-box')?.contains(document.activeElement)], focus from:window, visibilitychange[document.visibilityState === 'visible'] from:document"
+     hx-target="#filters-box" hx-swap="outerHTML"></div>

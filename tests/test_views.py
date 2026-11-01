@@ -918,3 +918,37 @@ def test_bot_after_deletion_says_the_chat_is_not_linked(client, linked, tg):
 
     client.post(url("delete", linked), {"confirm": "yes"})
     assert linked_subscription(42) is None
+
+
+# --- picking up changes made in the bot ------------------------------------------------
+
+
+def test_filters_page_watches_for_changes_every_few_seconds_and_on_focus(client, subscription):
+    html = html_of(client.get(url("detail", subscription)))
+    watcher = html.split('id="filters-sync"', 1)[1].split("</div>", 1)[0]
+    assert "every 5s" in watcher and "focus from:window" in watcher
+    assert html.count('id="filters-sync"') == 1
+
+
+def test_own_autosave_moves_the_watcher_on(client, subscription):
+    """A save made on the page returns the new version, so the watcher won't redraw it."""
+    html = html_of(autosave(client, subscription, {"changed": "levels", "levels": ["junior"]}))
+    subscription.refresh_from_db()
+    version = str(int(subscription.updated_at.timestamp() * 1000))
+    assert 'id="filters-sync" hidden hx-swap-oob="true"' in html
+    assert f"filters-form/?v={version}" in html
+    refresh = reverse("subscriptions:filters_form", args=[subscription.token])
+    assert client.get(f"{refresh}?v={version}").status_code == 204
+
+
+def test_bot_card_answers_204_until_the_bot_changes_something(client, linked):
+    page = html_of(client.get(url("radar_bot", linked)))
+    version = page.split("notifications/?v=", 1)[1].split('"', 1)[0]
+    card = reverse("subscriptions:notifications", args=[linked.token])
+
+    assert client.get(f"{card}?v={version}").status_code == 204
+
+    linked.frequency = Frequency.HOURLY  # changed in the bot
+    linked.save()
+    html = html_of(client.get(f"{card}?v={version}"))
+    assert 'value="hourly" checked' in html

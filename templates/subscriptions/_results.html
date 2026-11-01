@@ -40,3 +40,4 @@
 {% if since_id is not None and subscription %}{% include "subscriptions/_live.html" with oob=True %}{% endif %}
 {% endif %}
 {% if save_status %}{% include "subscriptions/_save_status.html" with oob=True %}{% endif %}
+{% if fragment and version and subscription and not append %}{% include "subscriptions/_filters_sync.html" with oob=True %}{% endif %}

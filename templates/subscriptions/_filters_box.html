@@ -1,12 +1,8 @@
 {% comment %}
-  Filters card of a radar. Re-reads itself from the database when the tab becomes
-  visible again (views.filters_form: 204 if nothing changed), so words edited in
-  the bot show up here, together with the matches for them.
+  Filters card of a radar. _filters_sync.html keeps it in step with the database
+  (edits made in the bot show up here within seconds, with the matches for them).
   Params: subscription, form, version (+ results context when refreshed, oob).
-{% endcomment %}<div id="filters-box"
-     hx-get="{% url 'subscriptions:filters_form' subscription.token %}?v={{ version }}"
-     hx-trigger="visibilitychange[document.visibilityState === 'visible'] from:document"
-     hx-swap="outerHTML">
+{% endcomment %}<div id="filters-box">
   {% include "subscriptions/_filters_form.html" %}
 </div>
-{% if oob %}{% include "subscriptions/_results.html" %}{% endif %}
+{% if oob %}{% include "subscriptions/_results.html" %}{% else %}{% include "subscriptions/_filters_sync.html" %}{% endif %}

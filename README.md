@@ -4,7 +4,7 @@
 
 Job Radar watches the [DOU](https://jobs.dou.ua) vacancy feeds, matches new vacancies against your filters and tells you about them on a website and in Telegram ([@job_radar_dou_bot](https://t.me/job_radar_dou_bot)).
 
-- **Website** (Ukrainian UI): keywords, excluded words, 18 DOU categories, level (Intern ... Lead, read from the title), remote or cities (the ones vacancies actually list), minimum salary in USD (with or without vacancies that name none) and how fresh the list should be. Changes save at once, the list polls for new vacancies every minute and marks fresh ones. No account: a radar is a private link.
+- **Website** (Ukrainian UI): keywords, excluded words, 18 DOU categories, level (Intern ... Lead, read from the title), remote or cities (the ones vacancies actually list), minimum salary in USD (with or without vacancies that name none) and how fresh the list should be. Changes save at once, the list polls for new vacancies every minute and marks fresh ones. No account: a radar is a private link. A one-paragraph «Дані» page says what is stored and why, and a radar can be deleted there, which also unlinks the bot.
 - **Telegram bot**: one tap links the chat to the radar. Digests arrive on a clock-aligned schedule in your time zone (hourly ... daily, with quiet hours), and the bot can check right now, show the latest matches and edit the same filters in a single settings message.
 - **Background jobs** fetch the feeds every 30 minutes, send due digests and once a day mark vacancies that were closed on DOU.
 

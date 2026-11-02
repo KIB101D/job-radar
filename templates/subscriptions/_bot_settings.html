@@ -43,6 +43,7 @@
         {% endfor %}
       </div>
       <p class="mono next-slot" id="next-slot-card">{% if next_slot %}Наступне сповіщення {{ next_slot }} <span class="tz">({{ tz_label }})</span>{% else %}Автосповіщення вимкнено{% endif %}</p>
+      {% if last_digest %}<p class="next-slot last-digest">{{ last_digest }}</p>{% endif %}
     </fieldset>
 
     <div class="setting-row">

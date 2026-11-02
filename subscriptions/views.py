@@ -371,8 +371,11 @@ def radar_bot(request, token: str):
 
 
 def _bot_context(subscription: Subscription) -> dict:
+    from bot.panel import last_digest_line  # bot depends on this app, not vice versa
+
     return {
         "version": _version(subscription),
+        "last_digest": last_digest_line(subscription),
         "bot_username": _bot_username(),
         "deep_link": _deep_link(subscription),
         "next_slot": schedule.next_slot_label(subscription),

@@ -317,3 +317,63 @@ def test_command_requires_token(settings):
     settings.TELEGRAM_BOT_TOKEN = ""
     with pytest.raises(CommandError, match="TELEGRAM_BOT_TOKEN"):
         call_command("send_digests")
+
+
+# --- the first slot after linking, and what the last digest did ----------------------
+
+
+def test_slot_that_passed_before_linking_does_not_count(tg, make_vacancy):
+    """Daily radar linked at 17:28: the 09:00 slot was before that, the next is tomorrow."""
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+
+    import time_machine
+
+    from bot.digests import send_due_digests
+    from subscriptions.models import Frequency, Subscription
+
+    madrid = ZoneInfo("Europe/Madrid")
+    linked = dt.datetime(2026, 11, 2, 17, 28, tzinfo=madrid)
+    sub = Subscription.objects.create(
+        categories=["Python"],
+        chat_id=4242,
+        linked_at=linked,
+        frequency=Frequency.DAILY,
+        timezone="Europe/Madrid",
+    )
+    make_vacancy(title="Python new", first_seen_at=linked + dt.timedelta(minutes=10))
+
+    with time_machine.travel(dt.datetime(2026, 11, 2, 18, 2, tzinfo=madrid), tick=False):
+        assert send_due_digests().due == 0
+    with time_machine.travel(dt.datetime(2026, 11, 3, 9, 1, tzinfo=madrid), tick=False):
+        run = send_due_digests()
+    assert run.sent == 1
+    sub.refresh_from_db()
+    assert sub.last_digest_count == 1
+
+
+def test_an_empty_slot_is_recorded_and_shown_in_the_bot(tg):
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+
+    import time_machine
+
+    from bot.digests import send_due_digests
+    from bot.panel import last_digest_line
+    from subscriptions.models import Frequency, Subscription
+
+    madrid = ZoneInfo("Europe/Madrid")
+    sub = Subscription.objects.create(
+        categories=["Python"],
+        chat_id=4343,
+        linked_at=dt.datetime(2026, 11, 2, 10, 0, tzinfo=madrid),
+        frequency=Frequency.EVERY_3H,
+        timezone="Europe/Madrid",
+    )
+    with time_machine.travel(dt.datetime(2026, 11, 2, 18, 2, tzinfo=madrid), tick=False):
+        run = send_due_digests()
+        sub.refresh_from_db()
+        line = last_digest_line(sub)
+    assert run.empty == 1 and tg.sent("sendMessage") == []  # nothing new: no message
+    assert sub.last_digest_count == 0
+    assert line == "📭 Остання перевірка сьогодні о 18:02: нових збігів не було, тож я мовчав."

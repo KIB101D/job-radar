@@ -976,3 +976,11 @@ def test_autosave_on_a_current_page_leaves_the_form_alone(client, subscription):
         autosave(client, subscription, {"changed": "levels", "levels": ["junior"], "v": current})
     )
     assert 'id="filters-box"' not in html
+
+
+def test_bot_card_shows_the_last_digest(client, linked):
+    linked.last_digest_at = timezone.now()
+    linked.last_digest_count = 0
+    linked.save()
+    html = html_of(client.get(url("radar_bot", linked)))
+    assert "нових збігів не було" in html

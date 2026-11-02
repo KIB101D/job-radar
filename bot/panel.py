@@ -274,6 +274,8 @@ def frequency_text(subscription: Subscription) -> str:
         )
     else:
         lines.append(texts.FREQUENCY_OFF_HINT.format(button=texts.BTN_CHECK))
+    if last := last_digest_line(subscription):
+        lines.append(last)
     if subscription.frequency != Frequency.OFF:
         if subscription.quiet_hours_enabled:
             lines.append(
@@ -285,6 +287,18 @@ def frequency_text(subscription: Subscription) -> str:
         else:
             lines.append(texts.QUIET_OFF)
     return "\n".join(lines)
+
+
+def last_digest_line(subscription: Subscription) -> str:
+    """What the last scheduled digest did, so a quiet bot doesn't look broken."""
+    if subscription.last_digest_at is None or subscription.last_digest_count is None:
+        return ""
+    when = schedule.moment_label(subscription, subscription.last_digest_at)
+    if subscription.last_digest_count == 0:
+        return texts.LAST_DIGEST_EMPTY.format(when=when)
+    return texts.LAST_DIGEST_SENT.format(
+        when=when, count_text=texts.new_vacancies(subscription.last_digest_count)
+    )
 
 
 def _frequency(subscription: Subscription, screen: str):

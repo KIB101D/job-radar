@@ -71,6 +71,10 @@ class Subscription(models.Model):
     )
     last_check_at = models.DateTimeField(null=True, blank=True)  # "check now" rate limit
     last_digest_at = models.DateTimeField(null=True, blank=True)
+    # How many vacancies that digest carried; 0 = the slot came but nothing was new
+    # (no message is sent then). Shown in the bot and on the site, so a quiet bot
+    # can be told apart from a broken one.
+    last_digest_count = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

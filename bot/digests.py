@@ -63,6 +63,7 @@ def claim_slot(subscription: Subscription, now) -> bool:
     claimed = (
         Subscription.objects.filter(pk=subscription.pk)
         .filter(Q(last_digest_at__isnull=True) | Q(last_digest_at__lt=slot))
+        .filter(Q(linked_at__isnull=True) | Q(linked_at__lt=slot))
         .update(last_digest_at=now)
     )
     return claimed == 1
@@ -105,6 +106,8 @@ def send_digest(subscription: Subscription, now, run: DigestRun, *, sleep=time.s
     vacancies = undelivered_new(subscription)
     if not vacancies:
         run.empty += 1  # nothing new: no message, slot still used up
+        # updated_at too: an open site tab picks the new status up by itself
+        Subscription.objects.filter(pk=subscription.pk).update(last_digest_count=0, updated_at=now)
         return
 
     try:
@@ -125,6 +128,9 @@ def send_digest(subscription: Subscription, now, run: DigestRun, *, sleep=time.s
 
     # The message covers all of them ("…і ще N на сайті" links the rest).
     mark_delivered(subscription, vacancies)
+    Subscription.objects.filter(pk=subscription.pk).update(
+        last_digest_count=len(vacancies), updated_at=now
+    )
     run.sent += 1
     sleep(SEND_INTERVAL_SECONDS)
 

@@ -392,3 +392,11 @@ def test_bot_filter_edit_keeps_bot_owned_columns(send, sub, panel):
     send(msg("django"))
     sub.refresh_from_db()
     assert sub.paused is True and sub.frequency == Frequency.HOURLY
+
+
+def test_notifications_screen_says_what_the_last_digest_did(send, sub):
+    Subscription.objects.filter(pk=sub.pk).update(
+        last_digest_at=timezone.now(), last_digest_count=3
+    )
+    text = send(msg(texts.BTN_NOTIFY_MENU)).sent()[-1]["text"]
+    assert "📬 Останній дайджест сьогодні о" in text and "3 нові вакансії" in text

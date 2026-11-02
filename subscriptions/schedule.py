@@ -118,8 +118,24 @@ def is_due(subscription, now: datetime | None = None) -> bool:
     slot = previous_slot(subscription, now)
     if slot is None:
         return False
+    linked_at = getattr(subscription, "linked_at", None)
+    if linked_at and slot <= linked_at:
+        return False  # that slot passed before the chat was linked
     last = subscription.last_digest_at
     return last is None or last < slot
+
+
+def moment_label(subscription, moment: datetime, now: datetime | None = None) -> str:
+    """A past moment in the user's zone: 'сьогодні о 18:02', 'вчора о 21:01', '28.10 о 09:03'."""
+    now = now or timezone.now()
+    tz = user_tz(subscription)
+    local, today = moment.astimezone(tz), now.astimezone(tz).date()
+    clock = local.strftime("%H:%M")
+    if local.date() == today:
+        return f"сьогодні о {clock}"
+    if local.date() == today - timedelta(days=1):
+        return f"вчора о {clock}"
+    return f"{local:%d.%m} о {clock}"
 
 
 def next_slot_label(subscription, now: datetime | None = None) -> str:

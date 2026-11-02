@@ -42,7 +42,13 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
       - run: pip install -r requirements.txt
-      - run: python manage.py ${{ inputs.command }}
+      # The command's output also goes to the run's Summary page, so the result
+      # ("Checked 2 subscriptions: 1 due, 1 sent…") is visible without opening logs.
+      # It holds counts and feed names only, nothing about users.
+      - name: python manage.py ${{ inputs.command }}
+        run: |
+          set -o pipefail
+          python manage.py ${{ inputs.command }} 2>&1 | tee output.txt
         env:
           DEBUG: "False"
           DB_CONN_MAX_AGE: "0"  # a short job: no persistent connections
@@ -51,3 +57,12 @@ jobs:
           SITE_URL: ${{ secrets.SITE_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_BOT_USERNAME: ${{ secrets.TELEGRAM_BOT_USERNAME }}
+      - name: Result on the Summary page
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### manage.py ${{ inputs.command }}"
+            echo '```'
+            tail -n 30 output.txt 2>/dev/null || echo "(no output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

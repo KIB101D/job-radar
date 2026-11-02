@@ -80,19 +80,42 @@ Then **Actions** tab → **Fetch vacancies** → **Run workflow** to fill the da
 | Workflow | Schedule (UTC) | Command |
 | --- | --- | --- |
 | `ci.yml` | every push and pull request | ruff, migrations check, `check --deploy`, tests on SQLite and Postgres |
-| `fetch-vacancies.yml` | `:07` and `:37` every hour | `fetch_vacancies` |
-| `send-digests.yml` | `:10` and `:40` every hour | `send_digests` |
+| `fetch-and-send.yml` | every 30 min, **started by cron-job.org** (step 5) | `fetch_vacancies`, then `send_digests` |
+| `fetch-vacancies.yml` | `:07` and `:37` every hour (GitHub, best effort) | `fetch_vacancies` |
+| `send-digests.yml` | `:10` and `:40` every hour (GitHub, best effort) | `send_digests` |
 | `check-active.yml` | daily at 03:23 | `check_active` |
 
-Every scheduled workflow also has **Run workflow** for a manual run.
+Every workflow also has **Run workflow** for a manual run.
 
 Things to know about GitHub's scheduler:
 
-- Runs can start several minutes late at busy times. Every job is safe to run late, twice or in parallel (DB locks, atomic digest slots).
+- It is best effort. Runs start late at busy times, and on a quiet repository GitHub skips most of them: in practice a handful a day instead of one every 30 minutes. That's why step 5 hands the timing to cron-job.org, and the GitHub schedules stay only as a fallback. Every job is safe to run late, twice or in parallel (DB locks, atomic digest slots).
 - Keep the repository **public**: Actions minutes are free for public repos, and ~100 short runs a day would use up the private-repo allowance.
 - GitHub turns off scheduled workflows in a public repo after **60 days without commits**. If that happens, re-enable them on the Actions tab.
 
-## 5. Check it end to end
+## 5. cron-job.org: a schedule that actually runs
+
+A run started through the GitHub API (what **Run workflow** does) always starts, so a free external scheduler calls that API every 30 minutes.
+
+1. **A token that can only start workflows of this repo.** GitHub → your avatar → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**:
+   - Repository access: **Only select repositories** → `job-radar`;
+   - Permissions → Repository permissions → **Actions: Read and write** (Metadata: Read-only is added by itself);
+   - expiration: up to a year; put a reminder to renew it.
+
+   Copy the token (`github_pat_…`); GitHub shows it once. If it ever leaks, someone can start or cancel this repo's workflows and nothing else; delete it on the same page.
+2. **The job.** Sign up at <https://cron-job.org> (free) → **Create cronjob**:
+
+   | Field | Value |
+   | --- | --- |
+   | URL | `https://api.github.com/repos/KIB101D/job-radar/actions/workflows/fetch-and-send.yml/dispatches` |
+   | Schedule | every 30 minutes (custom: minutes `7` and `37`, every hour) |
+   | Advanced → Request method | `POST` |
+   | Advanced → Headers | `Authorization: Bearer github_pat_…` · `Accept: application/vnd.github+json` · `X-GitHub-Api-Version: 2022-11-28` |
+   | Advanced → Request body | `{"ref":"main"}` |
+
+3. **Test run** on cron-job.org: the answer should be `204 No Content`, and a **Fetch and send** run appears on the Actions tab within seconds. `401` means a wrong or expired token, `404` a wrong URL or a token without access to the repo, `422` a wrong body.
+
+## 6. Check it end to end
 
 1. Open the site, set filters, **Підключити бота**, press **Start** in Telegram.
 2. Bot info from your laptop, with the production token in the environment:
@@ -102,7 +125,7 @@ Things to know about GitHub's scheduler:
    ```
 
    `URL` should be your `SITE_URL/telegram/webhook/`, and there should be no `Last error`.
-3. After the next `:10` or `:40`, the **Send digests** run log shows what was sent.
+3. After the next `:07` or `:37`, the **Fetch and send** run log shows what was fetched and sent, and the site says "оновлено щойно".
 
 ## Troubleshooting
 
@@ -113,4 +136,5 @@ Things to know about GitHub's scheduler:
 | The build fails at `collectstatic` with `SECRET_KEY` missing | The environment variables were added for Preview only, or after the deploy started. Add them for Production and redeploy. |
 | `--info` shows `Last error: Wrong response from the webhook: 403 Forbidden` | `TELEGRAM_WEBHOOK_SECRET` on Vercel differs from the one Telegram has. Redeploy, so the build sets the webhook again with the current secret. |
 | Webhook URL is empty | Someone ran `run_bot_locally` with the production token. Redeploy, or run `set_telegram_webhook` with production variables. |
+| "оновлено N год тому" keeps growing while the runs on the Actions tab are green | GitHub skipped the scheduled runs (see step 4). Check that the cron-job.org job is enabled and its last answer was `204`. |
 | Scheduled runs fail with a connection error | Neon's monthly compute quota is used up (the project is suspended until the next period), or `DATABASE_URL` differs from Vercel's. |

@@ -1,0 +1,28 @@
+# Fetch vacancies, then send due digests, in one go. Started every 30 min by an
+# external scheduler (cron-job.org) through the GitHub API; see docs/deploy.md.
+# GitHub's own `schedule` is best-effort and on a quiet repo skips most runs
+# (a few a day instead of every 30 min), while a dispatched run always starts.
+# The scheduled workflows stay as a fallback; every job is safe to run twice.
+name: Fetch and send
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: fetch-and-send
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    uses: ./.github/workflows/_manage.yml
+    with:
+      command: fetch_vacancies
+    secrets: inherit
+
+  digests:
+    needs: fetch
+    if: ${{ !cancelled() }}  # a failed fetch still leaves digests of what we have
+    uses: ./.github/workflows/_manage.yml
+    with:
+      command: send_digests
+    secrets: inherit

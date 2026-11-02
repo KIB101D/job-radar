@@ -14,7 +14,7 @@ Stack: Python 3.13, Django 5.2, HTMX, Postgres (Neon) / SQLite, httpx, feedparse
 
 ```mermaid
 flowchart LR
-    subgraph GA[GitHub Actions cron]
+    subgraph GA[GitHub Actions]
         F[fetch_vacancies<br/>every 30 min]
         D[send_digests<br/>every 30 min]
         C[check_active<br/>daily]
@@ -24,6 +24,9 @@ flowchart LR
     W[Django on Vercel<br/>site + webhook]
     TG[Telegram Bot API]
     U((User))
+    CJ[cron-job.org<br/>every 30 min]
+
+    CJ -- workflow_dispatch --> GA
 
     F -- RSS --> DOU
     C -- vacancy pages --> DOU
@@ -46,7 +49,7 @@ The website never scrapes. Web requests only read the database; everything that 
 
 ## Decisions worth explaining
 
-- **Scheduled jobs on GitHub Actions, not in the web process.** The site is a serverless function on Vercel: nothing runs between requests, and there's no free scheduler for it. Actions runs `manage.py` against the same Neon database. Every job takes a **DB-backed lock** (one conditional `UPDATE` with a TTL) and is safe to run late, twice or in parallel, which matters because GitHub's scheduler is best-effort.
+- **Scheduled jobs on GitHub Actions, not in the web process.** The site is a serverless function on Vercel: nothing runs between requests, and there's no free scheduler for it. GitHub's own `schedule` turned out to skip most runs on a quiet repo, so cron-job.org starts the jobs through the GitHub API every 30 minutes, and the GitHub schedules stay as a fallback. Actions runs `manage.py` against the same Neon database. Every job takes a **DB-backed lock** (one conditional `UPDATE` with a TTL) and is safe to run late, twice or in parallel, which matters because GitHub's scheduler is best-effort.
 - **Dedupe by canonical vacancy URL.** The DOU `guid` carries a changing timestamp, so the same vacancy would come back as "new". A vacancy can be in several feeds (Python and Front End overlap), so feeds are a many-to-many relation, not a column.
 - **Level, salary and city are read at match time.** `radar/attributes.py` parses "Middle+ / Senior" from the title, "$4000–7000" or "до $5000" from the salary text and cities from the location, as pure cached functions. No extra columns, so every stored vacancy gets the filters and a better rule needs no backfill. A title without a level and a vacancy without a salary pass by default: most DOU vacancies name neither.
 - **Matching in Python after a SQL prefilter.** Cheap conditions (active, remote, category) run in SQL; keywords use Unicode-aware word boundaries (`c++`, `.net`, `node.js`, Cyrillic) that SQLite and Postgres don't share. The table holds a few thousand rows, so this stays fast and identical everywhere.

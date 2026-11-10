@@ -10,14 +10,17 @@
       <h1 id="filters-title" class="h2">Що шукає твій радар</h1>
     </div>
     <div class="workspace">
-      <div class="workspace-side">
+      <div class="workspace-side" id="filters-sheet" data-sheet>
+        <div class="sheet-grip" aria-hidden="true"></div>
         {% include "subscriptions/_filters_box.html" %}
         {% if not subscription.is_linked %}
           <p class="page-hint">{% include "components/icons.html" with name="telegram" %}<span>Хочеш отримувати нові збіги в Telegram? <a href="{% url 'subscriptions:radar_bot' subscription.token %}">Підключи бота</a>, це один клік.</span></p>
         {% endif %}
         <p class="field-help bookmark">Збережи адресу цієї сторінки: за нею ти повернешся до своїх фільтрів з будь-якого пристрою. Не ділися нею з іншими.</p>
+        {% include "subscriptions/_filters_sheet.html" with part="foot" %}
       </div>
       {% include "subscriptions/_matches.html" %}
+      {% include "subscriptions/_filters_sheet.html" with part="open" %}
     </div>
   </div>
 </section>

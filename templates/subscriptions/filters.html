@@ -10,10 +10,13 @@
       <h1 id="filters-title" class="h2">Що шукає твій радар</h1>
     </div>
     <div class="workspace">
-      <div class="workspace-side">
+      <div class="workspace-side" id="filters-sheet" data-sheet>
+        <div class="sheet-grip" aria-hidden="true"></div>
         {% include "subscriptions/_filters_form.html" with submit_label="Створити радар" submit_hint="Після цього можна підключити Telegram-бота" %}
+        {% include "subscriptions/_filters_sheet.html" with part="foot" %}
       </div>
       {% include "subscriptions/_matches.html" %}
+      {% include "subscriptions/_filters_sheet.html" with part="open" %}
     </div>
   </div>
 </section>

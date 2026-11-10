@@ -1,0 +1,19 @@
+{% load radar_ui %}{% comment %}
+  Phone layout of the filters (static/js/app.js, "Filters sheet"). Below 960px the
+  filters column becomes a sheet that slides up from the bottom, so the matches come
+  first. The floating button opens it and shows how many filters are set; the
+  button at the bottom of the sheet closes it with the current match count.
+  Without JS none of this shows and the filters stay above the list.
+
+  On /filters/ (no radar yet) "Створити радар" is the main button, so this one is outlined.
+  Included twice per page: part="foot" inside the sheet, part="open" after it.
+{% endcomment %}{% if part == "foot" %}
+<div class="sheet-foot">
+  <button type="button" class="btn {% if subscription %}btn-primary{% else %}btn-outline{% endif %} btn-block" data-sheet-close><span data-sheet-count>Показати {{ page.total }} {{ page.total|uk_plural:"збіг,збіги,збігів" }}</span></button>
+</div>
+{% else %}
+<button type="button" class="sheet-fab" data-sheet-open aria-controls="filters-sheet" aria-expanded="false">
+  {% include "components/icons.html" with name="sliders" %}<span>Фільтри</span><span class="sheet-badge mono" data-filter-count hidden></span>
+</button>
+<div class="sheet-backdrop" data-sheet-close aria-hidden="true"></div>
+{% endif %}

@@ -170,9 +170,109 @@
 
   const GAP = 20;
 
+  const phone = window.matchMedia("(max-width: 959px)");
+
   function fitSticky(side) {
+    // On a phone the column is the filters sheet, placed by CSS.
+    if (phone.matches) return side.style.removeProperty("top");
     const top = Math.min(GAP, window.innerHeight - side.offsetHeight - GAP);
     side.style.top = `${top}px`;
+  }
+
+  // --- Filters sheet (phones) ---------------------------------------------------------------
+  // Below 960px the filters column is a sheet over the matches (CSS). The floating button
+  // opens it, "Показати N збігів", the backdrop, Esc or a swipe down close it. Changes in
+  // it save as usual, so the list behind is already up to date when it closes.
+
+  const sheet = () => document.querySelector("[data-sheet]");
+
+  function ukPlural(n, one, few, many) {
+    const tens = n % 100;
+    const units = n % 10;
+    if (units === 1 && tens !== 11) return one;
+    if (units >= 2 && units <= 4 && (tens < 12 || tens > 14)) return few;
+    return many;
+  }
+
+  function setSheet(open) {
+    const panel = sheet();
+    if (!panel) return;
+    const opener = document.querySelector("[data-sheet-open]");
+    open = open && phone.matches;
+    panel.classList.toggle("is-open", open);
+    panel.style.removeProperty("--drag");
+    document.documentElement.classList.toggle("sheet-is-open", open);
+    opener?.setAttribute("aria-expanded", String(open));
+    if (open) {
+      panel.scrollTop = 0;
+      panel.focus({ preventScroll: true });
+    } else if (panel.contains(document.activeElement)) {
+      opener?.focus({ preventScroll: true });
+    }
+  }
+
+  function sheetMode() {
+    const panel = sheet();
+    if (!panel) return;
+    if (phone.matches) {
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      panel.setAttribute("aria-label", "Фільтри");
+      panel.tabIndex = -1;
+    } else {
+      ["role", "aria-modal", "aria-label", "tabindex"].forEach((name) => panel.removeAttribute(name));
+      setSheet(false);
+    }
+  }
+
+  // Badge on the button: keywords plus every folded group that has a choice.
+  function refreshSheet() {
+    const panel = sheet();
+    if (!panel) return;
+    let set = panel.querySelectorAll(".fgroup-value.is-set").length;
+    panel.querySelectorAll("[data-chips] input[name]").forEach((input) => (set += splitKeywords(input.value).length));
+    const badge = document.querySelector("[data-filter-count]");
+    if (badge) {
+      badge.textContent = set;
+      badge.hidden = !set;
+    }
+    const total = Number.parseInt(document.getElementById("match-count")?.textContent || "", 10);
+    const label = panel.querySelector("[data-sheet-count]");
+    if (label && !Number.isNaN(total)) label.textContent = `Показати ${total} ${ukPlural(total, "збіг", "збіги", "збігів")}`;
+  }
+
+  // Swipe down from the top of the sheet (when it isn't scrolled) closes it.
+  function watchSwipe() {
+    const panel = sheet();
+    if (!panel) return;
+    let startY = null;
+    let dy = 0;
+    panel.addEventListener(
+      "touchstart",
+      (event) => {
+        const fromTop = event.touches[0].clientY - panel.getBoundingClientRect().top;
+        startY = panel.scrollTop <= 0 && fromTop < 72 ? event.touches[0].clientY : null;
+        dy = 0;
+      },
+      { passive: true },
+    );
+    panel.addEventListener(
+      "touchmove",
+      (event) => {
+        if (startY === null) return;
+        dy = Math.max(0, event.touches[0].clientY - startY);
+        panel.classList.add("is-dragging");
+        panel.style.setProperty("--drag", `${dy}px`);
+      },
+      { passive: true },
+    );
+    panel.addEventListener("touchend", () => {
+      if (startY === null) return;
+      panel.classList.remove("is-dragging");
+      startY = null;
+      if (dy > 90) setSheet(false);
+      else panel.style.removeProperty("--drag");
+    });
   }
 
   function watchSticky() {
@@ -248,20 +348,34 @@
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) return copy(copyButton);
 
+    if (event.target.closest("[data-sheet-open]")) return setSheet(true);
+    if (event.target.closest("[data-sheet-close]")) return setSheet(false);
+
     if (event.target.closest("[data-toast-close]")) {
       event.target.closest("[data-toast]")?.remove();
     }
   });
 
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.documentElement.classList.contains("sheet-is-open")) setSheet(false);
+  });
+
   document.addEventListener("change", (event) => {
     const group = event.target.closest?.(".fgroup");
     if (group) summarize(group);
+    refreshSheet();
   });
 
   document.addEventListener("DOMContentLoaded", () => {
     enhance(document);
     watchSticky();
+    sheetMode();
+    refreshSheet();
+    watchSwipe();
+    phone.addEventListener("change", sheetMode);
     // Content swapped in by HTMX gets the same treatment.
     document.body.addEventListener("htmx:load", (event) => enhance(event.target));
+    // New counts and redrawn filters (a save, the bot, a poll) update the badge and label.
+    document.body.addEventListener("htmx:afterSettle", refreshSheet);
   });
 })();

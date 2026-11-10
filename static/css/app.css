@@ -692,3 +692,88 @@ button.segmented-item:hover { color: var(--text); }
 .danger-title { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
 .btn-danger { align-self: flex-start; background: var(--red-bg); border-color: var(--red-border); color: var(--error); }
 .btn-danger:hover { border-color: var(--error); color: var(--error); }
+
+/* ---- Phones --------------------------------------------------------------------- */
+
+/* Below 960px the matches come first and the filters live in a sheet that slides up
+   from the bottom (static/js/app.js, "Filters sheet"). Only with JS (`html.js`):
+   without it the filters simply stay above the list. */
+.sheet-grip, .sheet-foot, .sheet-fab, .sheet-backdrop { display: none; }
+
+@media (max-width: 959px) {
+  .js .workspace-side {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain;
+    gap: 14px; padding: 0 16px;
+    background: var(--bg); border-top: 1px solid var(--border-strong);
+    border-radius: 20px 20px 0 0; box-shadow: 0 -16px 40px rgb(0 0 0 / 0.5);
+    transform: translateY(100%); visibility: hidden;
+    transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.28s;
+  }
+  .js .workspace-side.is-open {
+    transform: translateY(var(--drag, 0px)); visibility: visible;
+    transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .js .workspace-side.is-dragging { transition: none; }
+  .js .sheet-grip {
+    display: block; flex-shrink: 0; width: 40px; height: 4px; margin: 10px auto -6px;
+    border-radius: 2px; background: var(--border-btn);
+  }
+  .js .workspace-side .filters-head { position: sticky; top: 0; z-index: 2; padding-block: 6px; background: var(--bg); }
+  .js .sheet-foot {
+    display: block; position: sticky; bottom: 0; z-index: 2; margin-top: auto;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to bottom, transparent, var(--bg) 14px);
+  }
+  .js .sheet-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 55;
+    background: rgb(0 0 0 / 0.6); opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .js.sheet-is-open .sheet-backdrop { opacity: 1; pointer-events: auto; }
+  .js.sheet-is-open, .js.sheet-is-open body { overflow: hidden; }
+
+  /* Floating button in the thumb zone; its badge counts the filters that are set. */
+  .js .sheet-fab {
+    display: inline-flex; align-items: center; gap: 8px;
+    position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 40;
+    height: 48px; padding: 0 18px 0 16px; transform: translateX(-50%);
+    border: 0; border-radius: 999px; background: var(--lime); color: var(--on-lime);
+    font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.5);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .js.sheet-is-open .sheet-fab { opacity: 0; pointer-events: none; transform: translate(-50%, 12px); }
+  .sheet-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+    background: var(--on-lime); color: var(--lime); font-size: 12px;
+  }
+  .sheet-badge[hidden] { display: none; }
+  body:has(.sheet-fab) .site-footer { padding-bottom: 88px; }
+
+  .section-page .h2 { font-size: 28px; }
+  .section-page .stack-lg { gap: 20px; }
+
+  /* The whole card opens the vacancy, so the separate link row goes. */
+  .card { position: relative; }
+  .card-title a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  .card:active { border-color: var(--lime-border); }
+  .card-link { display: none; }
+  .card-foot:not(:has(.tag)) { display: none; }
+
+  /* The all-categories feed under the list makes a long page longer on a phone. */
+  .feed { display: none; }
+
+  /* 16px stops iOS Safari from zooming the page into a focused field. */
+  .input, .filters input[type="text"], .select { font-size: 16px; }
+  /* Fingers need bigger targets than a mouse. */
+  .check-sm { min-height: 44px; }
+  .toggle-chip span { min-height: 40px; }
+  .kw-chip button { width: 32px; height: 32px; }
+
+  .toast { right: 16px; top: 72px; }
+}
+
+@media (max-width: 959px) and (prefers-reduced-motion: reduce) {
+  .js .workspace-side, .js .workspace-side.is-open, .js .sheet-fab, .js .sheet-backdrop { transition: none; }
+}

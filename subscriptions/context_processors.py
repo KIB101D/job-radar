@@ -1,6 +1,12 @@
-"""Navigation: which page is active and where "Фільтри", "Telegram-бот" and "Дані" lead."""
+"""Navigation: which page is active and where "Фільтри", "Telegram-бот" and "Дані" lead.
+
+Also which web app manifest the page links (subscriptions/pwa.py): inside a radar, the
+one that opens that radar.
+"""
 
 from django.urls import reverse
+
+from .pwa import manifest_url
 
 # url_name -> nav item it belongs to
 _SECTIONS = {
@@ -15,7 +21,11 @@ _SECTIONS = {
 def navigation(request) -> dict:
     match = getattr(request, "resolver_match", None)
     if match is None or match.namespace != "subscriptions":
-        return {"nav_active": "", "nav_data_url": reverse("subscriptions:data")}
+        return {
+            "nav_active": "",
+            "nav_data_url": reverse("subscriptions:data"),
+            "manifest_url": manifest_url(None),
+        }
 
     token = match.kwargs.get("token")
     if token:
@@ -34,4 +44,5 @@ def navigation(request) -> dict:
         "nav_filters_url": filters_url,
         "nav_bot_url": bot_url,
         "nav_data_url": data_url,
+        "manifest_url": manifest_url(token),
     }

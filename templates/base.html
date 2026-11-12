@@ -8,6 +8,13 @@
   <title>{% block title %}Job Radar{% endblock %}</title>
   <meta name="description" content="Персональний радар IT-вакансій з DOU: збіги на сайті наживо і в Telegram-боті з зручною частотою.">
   <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  {# Installable app: subscriptions/pwa.py. iOS reads the apple-* tags, not the manifest's icons. #}
+  <link rel="manifest" href="{{ manifest_url|default:'/manifest.webmanifest' }}">
+  <link rel="apple-touch-icon" href="{% static 'img/icons/apple-touch-icon.png' %}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Job Radar">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   {# Space Grotesk has no Cyrillic, so Manrope draws Ukrainian headings. #}
@@ -46,11 +53,18 @@
   {% block footer %}
   <footer class="site-footer">
     <div class="wrap site-footer-inner">
-      <span>Job Radar · вакансії з DOU RSS · <a class="footer-link" href="{{ nav_data_url }}">Дані</a></span>
+      <span>Job Radar · вакансії з DOU RSS · <a class="footer-link" href="{{ nav_data_url }}">Дані</a><span class="install" data-install hidden> · <button type="button" class="footer-link link-btn" data-install-button>Встановити застосунок</button></span></span>
       <span class="mono">Python · Django · Telegram Bot API</span>
     </div>
   </footer>
   {% endblock %}
+
+  {# iOS has no install prompt: "Встановити застосунок" shows how to do it by hand (app.js). #}
+  <div class="install-hint" data-install-hint role="dialog" aria-label="Як встановити застосунок" hidden>
+    <img src="{% static 'img/icons/icon-192.png' %}" alt="" width="40" height="40">
+    <p>Натисни <strong>«Поділитися»</strong> у Safari, потім <strong>«На екран „Додому“»</strong>. Радар відкриватиметься з іконки, як застосунок.</p>
+    <button type="button" class="icon-btn" aria-label="Закрити" data-install-hint-close>{% include "components/icons.html" with name="close" %}</button>
+  </div>
 
   {# Pop-up notifications (components/toast.html) are swapped in here. #}
   <div id="toast-slot"></div>

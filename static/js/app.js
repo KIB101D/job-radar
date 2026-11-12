@@ -179,6 +179,57 @@
     side.style.top = `${top}px`;
   }
 
+  // --- Installable app ----------------------------------------------------------------------
+  // The service worker (subscriptions/pwa.py) gives the cache and the offline page. Chrome
+  // and Edge offer installing through `beforeinstallprompt`, so "Встановити застосунок"
+  // appears only when that's possible; iOS has no prompt, so there it shows where Safari
+  // keeps "На екран «Додому»". Opened from the icon, none of this shows.
+
+  let installPrompt = null;
+  const standalone = () =>
+    window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const iosSafari = () =>
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1);
+
+  function showInstall(visible) {
+    document.querySelectorAll("[data-install]").forEach((element) => (element.hidden = !visible));
+  }
+
+  function setInstallHint(open) {
+    const hint = document.querySelector("[data-install-hint]");
+    if (hint) hint.hidden = !open;
+  }
+
+  async function install() {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      installPrompt = null;
+      if (outcome === "accepted") showInstall(false);
+    } else if (iosSafari()) {
+      setInstallHint(true);
+    }
+  }
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    installPrompt = event;
+    showInstall(true);
+  });
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    showInstall(false);
+  });
+
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // No worker, no offline page; the site works the same.
+      });
+    });
+  }
+
   // --- Filters sheet (phones) ---------------------------------------------------------------
   // Below 960px the filters column is a sheet over the matches (CSS). The floating button
   // opens it, "Показати N збігів", the backdrop, Esc or a swipe down close it. Changes in
@@ -348,6 +399,8 @@
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) return copy(copyButton);
 
+    if (event.target.closest("[data-install-button]")) return install();
+    if (event.target.closest("[data-install-hint-close]")) return setInstallHint(false);
     if (event.target.closest("[data-sheet-open]")) return setSheet(true);
     if (event.target.closest("[data-sheet-close]")) return setSheet(false);
 
@@ -371,6 +424,7 @@
     watchSticky();
     sheetMode();
     refreshSheet();
+    if (iosSafari() && !standalone()) showInstall(true);
     watchSwipe();
     phone.addEventListener("change", sheetMode);
     // Content swapped in by HTMX gets the same treatment.

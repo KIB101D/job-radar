@@ -777,3 +777,30 @@ button.segmented-item:hover { color: var(--text); }
 @media (max-width: 959px) and (prefers-reduced-motion: reduce) {
   .js .workspace-side, .js .workspace-side.is-open, .js .sheet-fab, .js .sheet-backdrop { transition: none; }
 }
+
+/* ---- Installable app (subscriptions/pwa.py) --------------------------------------- */
+
+.install[hidden], .install-hint[hidden] { display: none; }
+.field-help.install { display: flex; align-items: center; gap: 6px; color: var(--lime); }
+.field-help.install .link-btn { padding: 4px 0; font-size: inherit; color: inherit; }
+.site-footer .install .link-btn { padding: 0; font-size: inherit; }
+
+/* iOS has no install prompt, so this card says where Safari keeps it. */
+.install-hint {
+  position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 70;
+  display: flex; align-items: flex-start; gap: 12px; max-width: 420px; margin: 0 auto; padding: 14px;
+  background: var(--panel-raised); border: 1px solid var(--border-strong); border-radius: 14px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5); font-size: 14px; color: var(--muted);
+}
+.install-hint img { flex-shrink: 0; border-radius: 10px; }
+.install-hint p { margin: 0; flex: 1; }
+.install-hint strong { color: var(--text); font-weight: 600; }
+
+/* Opened from the home-screen icon: no browser bar, so leave room for the status bar. */
+@media (display-mode: standalone) {
+  .site-header { padding-top: env(safe-area-inset-top); }
+}
+
+.offline { display: flex; flex-direction: column; align-items: center; gap: 16px; padding-block: 48px; text-align: center; }
+.offline > svg { width: 48px; height: 48px; color: var(--lime); }
+.offline .lead { max-width: 420px; }

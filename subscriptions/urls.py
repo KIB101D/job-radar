@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import pwa, views
 
 app_name = "subscriptions"
 
@@ -15,6 +15,11 @@ urlpatterns = [
     path("s/<str:token>/connect/", views.connect, name="connect"),
     path("s/<str:token>/frequency/", views.frequency, name="frequency"),
     path("s/<str:token>/data/", views.radar_data, name="radar_data"),
+    # Installable app (subscriptions/pwa.py)
+    path("manifest.webmanifest", pwa.manifest, name="manifest"),
+    path("s/<str:token>/manifest.webmanifest", pwa.radar_manifest, name="radar_manifest"),
+    path("sw.js", pwa.service_worker, name="service_worker"),
+    path("offline/", pwa.offline, name="offline"),
     # Actions
     path("s/<str:token>/notifications/", views.notifications, name="notifications"),
     path("s/<str:token>/unlink/", views.unlink, name="unlink"),

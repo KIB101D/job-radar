@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% comment %}
+  Cached by the service worker (subscriptions/pwa.py) and shown instead of the
+  browser's error page when a page can't load. The link reloads the address that
+  failed: the worker answers for that URL, so the address bar still shows it.
+{% endcomment %}
+{% block title %}Немає з'єднання · Job Radar{% endblock %}
+{% block content %}
+<section class="section section-page">
+  <div class="wrap offline">
+    {% include "components/icons.html" with name="radar" %}
+    <h1 class="h2">Немає з'єднання</h1>
+    <p class="lead">Радар не може дістатися до сервера. Щойно інтернет повернеться, сторінка відкриється як завжди.</p>
+    <a class="btn btn-primary" href="">Спробувати ще</a>
+  </div>
+</section>
+{% endblock %}

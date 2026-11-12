@@ -4,7 +4,7 @@
 
 Job Radar watches the [DOU](https://jobs.dou.ua) vacancy feeds, matches new vacancies against your filters and tells you about them on a website and in Telegram ([@job_radar_dou_bot](https://t.me/job_radar_dou_bot)).
 
-- **Website** (Ukrainian UI): keywords, excluded words, 18 DOU categories, level (Intern ... Lead, read from the title), remote or cities (the ones vacancies actually list), minimum salary in USD (with or without vacancies that name none) and how fresh the list should be. Changes save at once, the list polls for new vacancies every minute and marks fresh ones. No account: a radar is a private link. A one-paragraph «Дані» page says what is stored and why, and a radar can be deleted there, which also unlinks the bot.
+- **Website** (Ukrainian UI): keywords, excluded words, 18 DOU categories, level (Intern ... Lead, read from the title), remote or cities (the ones vacancies actually list), minimum salary in USD (with or without vacancies that name none) and how fresh the list should be. Changes save at once, the list polls for new vacancies every minute and marks fresh ones. No account: a radar is a private link. A one-paragraph «Дані» page says what is stored and why, and a radar can be deleted there, which also unlinks the bot. On a phone the matches come first and the filters open as a bottom sheet. The site installs as an app (PWA): from the home-screen icon it opens your radar full screen, and without a connection it shows an offline page instead of the browser's error.
 - **Telegram bot**: one tap links the chat to the radar. Digests arrive on a clock-aligned schedule in your time zone (hourly ... daily, with quiet hours), and the bot can check right now, show the latest matches and edit the same filters in a single settings message.
 - **Background jobs** fetch the feeds every 30 minutes, send due digests and once a day mark vacancies that were closed on DOU.
 
@@ -59,6 +59,7 @@ The website never scrapes. Web requests only read the database; everything that 
 - **One message for settings in the bot.** Filters and notification settings live in a single message edited in place (`editMessageText`), so the chat doesn't fill up with menus. Saving on the website re-renders that message.
 - **Closed vacancies.** A vacancy that left the feed isn't necessarily closed. `check_active` opens pages of vacancies gone from the feed for over a day (rate-limited): 404/410 or "(вакансія неактивна)" in the title means closed.
 - **Plain Bot API over httpx** instead of a bot framework: the webhook is an ordinary Django view with a secret-header check, and the client is easy to fake in tests.
+- **An installable app without an app store.** A radar is a private link, so the app must open that link. Radar pages link their own web app manifest (`/s/<token>/manifest.webmanifest`) whose `start_url` is the radar; this works even where an installed app doesn't share cookies with the browser (iOS). The service worker is rendered by Django so it can list the hashed static names; a deploy changes them and with them the worker's version, which drops the old cache. It caches static files and an offline page only: pages and HTMX requests always go to the network, so nothing private or stale stays on the device (`subscriptions/pwa.py`).
 - **HTMX instead of a SPA.** Server-rendered templates with partial swaps: live polling, out-of-band updates of counters, auto-save. Everything still works as plain forms without JavaScript.
 
 ## Running locally
@@ -88,7 +89,7 @@ ruff check . && ruff format --check .
 TEST_DATABASE_URL=postgres://user:pass@localhost:5432/jobradar pytest   # on Postgres
 ```
 
-About 340 tests: RSS parsing on saved DOU fixtures (including broken entries), fetch retries and politeness with a mocked transport, matching edge cases, the schedule across time zones and DST (`time-machine`), digests and the bot against a fake Telegram client that records every call, HTMX views, and the closed-vacancy check on saved DOU pages. CI runs the suite on both SQLite and Postgres 16 and fails on missing migrations or a failing `check --deploy`.
+About 430 tests: RSS parsing on saved DOU fixtures (including broken entries), fetch retries and politeness with a mocked transport, matching edge cases, the schedule across time zones and DST (`time-machine`), digests and the bot against a fake Telegram client that records every call, HTMX views, the PWA manifests and service worker, and the closed-vacancy check on saved DOU pages. CI runs the suite on both SQLite and Postgres 16 and fails on missing migrations or a failing `check --deploy`.
 
 ## Deploy
 
@@ -99,7 +100,7 @@ Vercel (site + webhook) + Neon (Postgres) + GitHub Actions (jobs), all on free p
 ```
 config/            settings (env-driven), urls, test settings
 radar/             feeds, vacancies, fetcher, parser, matching, search, check_active
-subscriptions/     radars, schedule, delivery, website views/forms, template tags
+subscriptions/     radars, schedule, delivery, website views/forms, template tags, PWA (manifest, service worker)
 bot/               Telegram client, webhook, handlers, settings panel, digests
 templates/ static/ server-rendered UI, HTMX, small vanilla JS, CSS
 tests/             pytest suite and DOU fixtures

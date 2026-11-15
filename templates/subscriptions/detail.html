@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Мій радар | Job Radar{% endblock %}
 
@@ -17,7 +18,11 @@
           <p class="page-hint">{% include "components/icons.html" with name="telegram" %}<span>Хочеш отримувати нові збіги в Telegram? <a href="{% url 'subscriptions:radar_bot' subscription.token %}">Підключи бота</a>, це один клік.</span></p>
         {% endif %}
         <p class="field-help bookmark">Збережи адресу цієї сторінки: за нею ти повернешся до своїх фільтрів з будь-якого пристрою. Не ділися нею з іншими.</p>
-        <p class="field-help install" data-install hidden>{% include "components/icons.html" with name="radar" %}<button type="button" class="link-btn underline" data-install-button>Встановити радар як застосунок</button></p>
+        {# Shown by app.js only where the radar can be installed (Chrome, Edge, iOS Safari). #}
+        <button type="button" class="install-badge" data-install data-install-button hidden>
+          <img src="{% static 'img/icons/icon-192.png' %}" alt="" width="40" height="40">
+          <span>Встановити радар як застосунок</span>
+        </button>
         {% include "subscriptions/_filters_sheet.html" with part="foot" %}
       </div>
       {% include "subscriptions/_matches.html" %}

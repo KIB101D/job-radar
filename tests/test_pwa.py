@@ -74,7 +74,8 @@ def test_pages_carry_the_ios_tags_and_the_hidden_install_entry(client, subscript
     assert 'rel="apple-touch-icon"' in html
     assert 'name="apple-mobile-web-app-capable" content="yes"' in html
     # Shown by app.js only when installing is possible.
-    assert html.count("data-install hidden") == 2  # footer and the filters column
+    assert html.count("data-install ") == 1  # the badge in the filters column only
+    assert 'class="install-badge" data-install data-install-button hidden' in html
     assert "data-install-hint" in html
 
 

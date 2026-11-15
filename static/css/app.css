@@ -780,10 +780,21 @@ button.segmented-item:hover { color: var(--text); }
 
 /* ---- Installable app (subscriptions/pwa.py) --------------------------------------- */
 
-.install[hidden], .install-hint[hidden] { display: none; }
-.field-help.install { display: flex; align-items: center; gap: 6px; color: var(--lime); }
-.field-help.install .link-btn { padding: 4px 0; font-size: inherit; color: inherit; }
-.site-footer .install .link-btn { padding: 0; font-size: inherit; }
+.install-badge[hidden], .install-hint[hidden] { display: none; }
+
+/* Shaped like an app-store badge: the app icon and what the button does. */
+.install-badge {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 16px;
+  background: var(--panel-raised); border: 1px solid var(--border-strong); border-radius: 14px;
+  color: var(--text); font: inherit; font-size: 15px; font-weight: 600; text-align: left;
+  cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
+}
+.install-badge:hover { border-color: var(--lime-border); }
+.install-badge:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.install-badge img {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.06);
+}
 
 /* iOS has no install prompt, so this card says where Safari keeps it. */
 .install-hint {

@@ -272,7 +272,14 @@ def frequency_text(subscription: Subscription) -> str:
         lines.append(texts.FREQUENCY_OFF_HINT.format(button=texts.BTN_CHECK))
     if last := last_digest_line(subscription):
         lines.append(last)
-    # Quiet hours: the button under the message says whether they're on.
+    # Quiet hours always close the text: their window and whether they're on.
+    lines.append(
+        texts.QUIET_LINE.format(
+            start=f"{subscription.quiet_hours_start:02d}:00",
+            end=f"{subscription.quiet_hours_end:02d}:00",
+            mark="✅" if subscription.quiet_hours_enabled else "❌",
+        )
+    )
     return "\n".join(lines)
 
 

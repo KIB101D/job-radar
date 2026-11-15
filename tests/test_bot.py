@@ -398,15 +398,16 @@ def test_pressing_selected_frequency_again_is_fine(send, linked, tg):
 
 def test_quiet_hours_button_switches_to_what_it_says(send, linked):
     payload = send(message_update(texts.BTN_FREQUENCY)).sent()[-1]
+    # The last line of the text, with whether they're on.
+    assert payload["text"].endswith("Тихі години 22:00–08:00: ✅")
     assert payload["reply_markup"]["inline_keyboard"][-1][0]["callback_data"] == "quiet:off"
 
     tg = send(callback_update("quiet:off"))
     linked.refresh_from_db()
     assert linked.quiet_hours_enabled is False
     edited = tg.sent("editMessageText")[-1]
-    # The button says it; the text has no explanation of quiet hours.
     assert edited["reply_markup"]["inline_keyboard"][-1][0]["text"] == texts.QUIET_BUTTON_OFF
-    assert "Тихі години" not in edited["text"]
+    assert edited["text"].endswith("Тихі години 22:00–08:00: ❌")  # still there, crossed
 
 
 def test_frequency_off_text(send, linked):

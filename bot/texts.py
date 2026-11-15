@@ -93,6 +93,7 @@ LAST_DIGEST_SENT = "📬 Останній дайджест {when}: {count_text}.
 LAST_DIGEST_EMPTY = "📭 Остання перевірка {when}: нових збігів не було, тож я мовчав."
 FREQUENCY_OFF_HINT = "Перевіряй вручну кнопкою «{button}»."
 FREQUENCY_PAUSED = "⏸ Сповіщення на паузі. Натисни «{button}» у меню, щоб відновити."
+QUIET_LINE = "Тихі години {start}–{end}: {mark}"
 QUIET_BUTTON_ON = "🌙 Тихі години: увімкнено"
 QUIET_BUTTON_OFF = "🌙 Тихі години: вимкнено"
 FREQUENCY_SAVED = "Збережено"

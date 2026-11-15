@@ -352,7 +352,7 @@ def test_slot_that_passed_before_linking_does_not_count(tg, make_vacancy):
     assert sub.last_digest_count == 1
 
 
-def test_an_empty_slot_is_recorded_and_shown_in_the_bot(tg):
+def test_an_empty_slot_is_recorded_and_shown_on_the_site_only(tg):
     import datetime as dt
     from zoneinfo import ZoneInfo
 
@@ -373,7 +373,9 @@ def test_an_empty_slot_is_recorded_and_shown_in_the_bot(tg):
     with time_machine.travel(dt.datetime(2026, 11, 2, 18, 2, tzinfo=madrid), tick=False):
         run = send_due_digests()
         sub.refresh_from_db()
-        line = last_digest_line(sub)
+        site_line = last_digest_line(sub, empty=True)
+        bot_line = last_digest_line(sub)
     assert run.empty == 1 and tg.sent("sendMessage") == []  # nothing new: no message
     assert sub.last_digest_count == 0
-    assert line == "📭 Остання перевірка сьогодні о 18:02: нових збігів не було, тож я мовчав."
+    assert site_line == "📭 Остання перевірка сьогодні о 18:02: нових збігів не було, тож я мовчав."
+    assert bot_line == ""  # the chat shows only digests that were sent

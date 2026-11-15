@@ -156,8 +156,8 @@ def test_start_with_token_links_chat_and_sends_welcome_batch_and_frequency(send,
     assert batch["parse_mode"] == "HTML"
     assert "Як часто надсилати нове?" in frequency["text"]
     rows = frequency["reply_markup"]["inline_keyboard"]
-    assert len(rows) == 5  # 3 rows of 2 + quiet hours + close
-    assert rows[-1][0]["callback_data"] == "close"
+    assert len(rows) == 4  # 3 rows of 2 + quiet hours, no "Закрити"
+    assert rows[-1][0]["callback_data"] == "quiet:off"
     assert Delivery.objects.filter(subscription=sub).count() == 5
 
 
@@ -398,12 +398,15 @@ def test_pressing_selected_frequency_again_is_fine(send, linked, tg):
 
 def test_quiet_hours_button_switches_to_what_it_says(send, linked):
     payload = send(message_update(texts.BTN_FREQUENCY)).sent()[-1]
-    assert payload["reply_markup"]["inline_keyboard"][-2][0]["callback_data"] == "quiet:off"
+    assert payload["reply_markup"]["inline_keyboard"][-1][0]["callback_data"] == "quiet:off"
 
     tg = send(callback_update("quiet:off"))
     linked.refresh_from_db()
     assert linked.quiet_hours_enabled is False
-    assert texts.QUIET_OFF in tg.sent("editMessageText")[-1]["text"]
+    edited = tg.sent("editMessageText")[-1]
+    # The button says it; the text has no explanation of quiet hours.
+    assert edited["reply_markup"]["inline_keyboard"][-1][0]["text"] == texts.QUIET_BUTTON_OFF
+    assert "Тихі години" not in edited["text"]
 
 
 def test_frequency_off_text(send, linked):
@@ -663,7 +666,7 @@ def test_site_change_edits_the_settings_message_in_telegram(client, send, linked
 def test_site_quiet_hours_change_updates_the_button(client, send, linked):
     tg = send(message_update(texts.BTN_FREQUENCY))
     site_post(client, linked, changed="quiet_hours_enabled")  # unchecked
-    quiet_button = tg.sent("editMessageText")[-1]["reply_markup"]["inline_keyboard"][-2][0]
+    quiet_button = tg.sent("editMessageText")[-1]["reply_markup"]["inline_keyboard"][-1][0]
     assert quiet_button == {"text": texts.QUIET_BUTTON_OFF, "callback_data": "quiet:on"}
 
 

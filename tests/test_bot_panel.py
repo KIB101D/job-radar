@@ -113,14 +113,14 @@ def test_filters_button_opens_filters_screen_directly(send, sub, make_vacancy):
     assert "Те саме на сайті" not in text
     assert {"✏️ Ключові слова", "🚫 Виключені слова"} <= set(labels(payload))  # no counters
     assert "📊 Зараз збігів: <b>1</b>" in text
-    assert buttons(payload)[-1]["callback_data"] == "close"
+    assert "close" not in {b.get("callback_data") for b in buttons(payload)}
 
 
 def test_notifications_button_opens_frequency_screen_directly(send, sub):
     payload = send(msg(texts.BTN_NOTIFY_MENU)).sent()[-1]
     assert payload["text"].startswith("⏰ <b>Як часто надсилати нове?</b>")
     assert "✅ Кожні 3 год" in labels(payload)
-    assert buttons(payload)[-1]["callback_data"] == "close"
+    assert "close" not in {b.get("callback_data") for b in buttons(payload)}
 
 
 def test_reopening_replaces_the_old_panel_and_cleans_the_tap(send, sub, panel):

@@ -375,7 +375,7 @@ def _bot_context(subscription: Subscription) -> dict:
 
     return {
         "version": _version(subscription),
-        "last_digest": last_digest_line(subscription),
+        "last_digest": last_digest_line(subscription, empty=True),
         "bot_username": _bot_username(),
         "deep_link": _deep_link(subscription),
         "next_slot": schedule.next_slot_label(subscription),

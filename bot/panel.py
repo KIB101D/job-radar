@@ -61,9 +61,6 @@ def _gone(exc: TelegramError) -> bool:
     return any(marker in exc.description.lower() for marker in GONE)
 
 
-CLOSE_BUTTON = {"text": texts.BTN_CLOSE, "callback_data": "close"}
-
-
 def fingerprint(word: str) -> str:
     return f"{zlib.crc32(word.encode()):08x}"
 
@@ -146,7 +143,6 @@ def _filters(subscription: Subscription, screen: str):
     url = radar_url(subscription)
     if is_public_url(url):  # Telegram won't accept a localhost button in development
         rows.append([{"text": texts.BTN_SITE, "url": url}])
-    rows.append([CLOSE_BUTTON])
     return text, rows
 
 
@@ -276,26 +272,21 @@ def frequency_text(subscription: Subscription) -> str:
         lines.append(texts.FREQUENCY_OFF_HINT.format(button=texts.BTN_CHECK))
     if last := last_digest_line(subscription):
         lines.append(last)
-    if subscription.frequency != Frequency.OFF:
-        if subscription.quiet_hours_enabled:
-            lines.append(
-                texts.QUIET_ON.format(
-                    start=f"{subscription.quiet_hours_start:02d}:00",
-                    end=f"{subscription.quiet_hours_end:02d}:00",
-                )
-            )
-        else:
-            lines.append(texts.QUIET_OFF)
+    # Quiet hours: the button under the message says whether they're on.
     return "\n".join(lines)
 
 
-def last_digest_line(subscription: Subscription) -> str:
-    """What the last scheduled digest did, so a quiet bot doesn't look broken."""
+def last_digest_line(subscription: Subscription, *, empty: bool = False) -> str:
+    """When the last scheduled digest went out and with how many vacancies.
+
+    A check that found nothing new is reported only with `empty=True` (the website,
+    where a quiet bot could look broken); the chat itself shows only real digests.
+    """
     if subscription.last_digest_at is None or subscription.last_digest_count is None:
         return ""
     when = schedule.moment_label(subscription, subscription.last_digest_at)
     if subscription.last_digest_count == 0:
-        return texts.LAST_DIGEST_EMPTY.format(when=when)
+        return texts.LAST_DIGEST_EMPTY.format(when=when) if empty else ""
     return texts.LAST_DIGEST_SENT.format(
         when=when, count_text=texts.new_vacancies(subscription.last_digest_count)
     )
@@ -315,7 +306,6 @@ def _frequency(subscription: Subscription, screen: str):
         rows.append([{"text": texts.QUIET_BUTTON_ON, "callback_data": "quiet:off"}])
     else:
         rows.append([{"text": texts.QUIET_BUTTON_OFF, "callback_data": "quiet:on"}])
-    rows.append([CLOSE_BUTTON])
     return frequency_text(subscription), rows
 
 
@@ -514,7 +504,7 @@ def handle_callback(subscription: Subscription, data: str, message_id: int) -> s
     note = ""
     if kind == "nav" and (value in SCREENS or value in SCREEN_ALIASES):
         screen = SCREEN_ALIASES.get(value, value)
-    elif kind == "close":
+    elif kind == "close":  # panels sent before the button was dropped still carry it
         close_panel(subscription, message_id)
         return ""
     elif kind == "freq" and value in Frequency.values:

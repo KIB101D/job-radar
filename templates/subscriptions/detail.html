@@ -19,8 +19,10 @@
         {% endif %}
         <p class="field-help bookmark">Збережи адресу цієї сторінки: за нею ти повернешся до своїх фільтрів з будь-якого пристрою. Не ділися нею з іншими.</p>
         {# Shown by app.js only where the radar can be installed (Chrome, Edge, iOS Safari). #}
+        {# A small app-store-like badge on a computer, a plain link on a phone (app.css). #}
         <button type="button" class="install-badge" data-install data-install-button hidden>
-          <img src="{% static 'img/icons/icon-192.png' %}" alt="" width="40" height="40">
+          <img src="{% static 'img/icons/icon-192.png' %}" alt="" width="28" height="28">
+          {% include "components/icons.html" with name="radar" %}
           <span>Встановити радар як застосунок</span>
         </button>
         {% include "subscriptions/_filters_sheet.html" with part="foot" %}
